@@ -3,14 +3,14 @@ package validation
 import (
 	"context"
 
+	"github.com/filecoin-project/chain-validation/pkg/chain"
+	"github.com/filecoin-project/chain-validation/pkg/state"
+	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
 
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/address"
 	"github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/filecoin-project/chain-validation/pkg/chain"
-	"github.com/filecoin-project/chain-validation/pkg/state"
 )
 
 type Signer interface {
@@ -60,8 +60,11 @@ func (mf *MessageFactory) MakeMessage(from, to state.Address, method chain.Metho
 	return msg, nil
 }
 
-func (mf *MessageFactory) FromSingletonAddress(addr state.SingletonActorID) (state.Address) {
+func (mf *MessageFactory) FromSingletonAddress(addr state.SingletonActorID) state.Address {
 	return fromSingletonAddress(addr)
+}
+func (mf *MessageFactory) FromActorCodeCid(code state.ActorCodeID) cid.Cid {
+	return fromActorCode(code)
 }
 
 // Maps method enumeration values to method names.
@@ -70,15 +73,17 @@ var methods = []uint64{
 	chain.NoMethod: 0,
 	chain.InitExec: actors.IAMethods.Exec,
 
-	chain.StoragePowerConstructor: actors.SPAMethods.Constructor,
+	chain.StoragePowerConstructor:        actors.SPAMethods.Constructor,
 	chain.StoragePowerCreateStorageMiner: actors.SPAMethods.CreateStorageMiner,
-	chain.StoragePowerUpdatePower: actors.SPAMethods.UpdateStorage,
+	chain.StoragePowerUpdatePower:        actors.SPAMethods.UpdateStorage,
 
-	chain.StorageMinerUpdatePeerID: actors.MAMethods.UpdatePeerID,
-	chain.StorageMinerGetOwner: actors.MAMethods.GetOwner,
-	chain.StorageMinerGetPower: actors.MAMethods.GetPower,
+	chain.StorageMinerUpdatePeerID:  actors.MAMethods.UpdatePeerID,
+	chain.StorageMinerGetOwner:      actors.MAMethods.GetOwner,
+	chain.StorageMinerGetPower:      actors.MAMethods.GetPower,
 	chain.StorageMinerGetWorkerAddr: actors.MAMethods.GetWorkerAddr,
-	chain.StorageMinerGetPeerID: actors.MAMethods.GetPeerID,
+	chain.StorageMinerGetPeerID:     actors.MAMethods.GetPeerID,
 	chain.StorageMinerGetSectorSize: actors.MAMethods.GetSectorSize,
+
+	chain.PaymentChannelCreate: actors.PCAMethods.Constructor,
 	// More to follow...
 }
