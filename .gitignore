@@ -24,3 +24,5 @@ bin/ipget
 bin/tmp/*
 .idea
 lotus.iml
+data
+.env
