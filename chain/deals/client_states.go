@@ -153,7 +153,7 @@ func (c *Client) sealing(ctx context.Context, deal ClientDeal) (func(*ClientDeal
 		return false, true, nil
 	}
 
-	called := func(msg *types.Message, ts *types.TipSet, curH uint64) (more bool, err error) {
+	called := func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH uint64) (more bool, err error) {
 		defer func() {
 			if err != nil {
 				select {
@@ -170,23 +170,6 @@ func (c *Client) sealing(ctx context.Context, deal ClientDeal) (func(*ClientDeal
 		if msg == nil {
 			log.Error("timed out waiting for deal activation... what now?")
 			return false, nil
-		}
-
-		var params actors.SectorProveCommitInfo
-		if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-			return false, err
-		}
-
-		var found bool
-		for _, dealID := range params.DealIDs {
-			if dealID == deal.DealID {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return true, nil
 		}
 
 		sd, err := stmgr.GetStorageDeal(ctx, c.sm, deal.DealID, ts)
@@ -217,7 +200,32 @@ func (c *Client) sealing(ctx context.Context, deal ClientDeal) (func(*ClientDeal
 		return nil
 	}
 
-	if err := c.events.Called(checkFunc, called, revert, 3, build.SealRandomnessLookbackLimit, deal.Proposal.Provider, actors.MAMethods.ProveCommitSector); err != nil {
+	matchEvent := func(msg *types.Message) (bool, error) {
+		if msg.To != deal.Proposal.Provider {
+			return false, nil
+		}
+
+		if msg.Method != actors.MAMethods.ProveCommitSector {
+			return false, nil
+		}
+
+		var params actors.SectorProveCommitInfo
+		if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+			return false, err
+		}
+
+		var found bool
+		for _, dealID := range params.DealIDs {
+			if dealID == deal.DealID {
+				found = true
+				break
+			}
+		}
+
+		return found, nil
+	}
+
+	if err := c.events.Called(checkFunc, called, revert, 3, build.SealRandomnessLookbackLimit, matchEvent); err != nil {
 		return nil, xerrors.Errorf("failed to set up called handler")
 	}
 

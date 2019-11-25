@@ -38,12 +38,14 @@ type FullNode interface {
 	// syncer
 	SyncState(context.Context) (*SyncState, error)
 	SyncSubmitBlock(ctx context.Context, blk *types.BlockMsg) error
+	SyncIncomingBlocks(ctx context.Context) (<-chan *types.BlockHeader, error)
 
 	// messages
 	MpoolPending(context.Context, *types.TipSet) ([]*types.SignedMessage, error)
 	MpoolPush(context.Context, *types.SignedMessage) error                          // TODO: remove
 	MpoolPushMessage(context.Context, *types.Message) (*types.SignedMessage, error) // get nonce, sign, push
 	MpoolGetNonce(context.Context, address.Address) (uint64, error)
+	MpoolSub(context.Context) (<-chan MpoolUpdate, error)
 
 	// FullNodeStruct
 
@@ -110,6 +112,9 @@ type FullNode interface {
 	StateMarketParticipants(context.Context, *types.TipSet) (map[string]actors.StorageParticipantBalance, error)
 	StateMarketDeals(context.Context, *types.TipSet) (map[string]actors.OnChainDeal, error)
 	StateMarketStorageDeal(context.Context, uint64, *types.TipSet) (*actors.OnChainDeal, error)
+	StateLookupID(context.Context, address.Address, *types.TipSet) (address.Address, error)
+	StateChangedActors(context.Context, cid.Cid, cid.Cid) (map[string]types.Actor, error)
+	StateGetReceipt(context.Context, cid.Cid, *types.TipSet) (*types.MessageReceipt, error)
 
 	MarketEnsureAvailable(context.Context, address.Address, types.BigInt) error
 	// MarketFreeBalance
@@ -253,12 +258,16 @@ type ReplayResults struct {
 	Error   string
 }
 
-type SyncState struct {
+type ActiveSync struct {
 	Base   *types.TipSet
 	Target *types.TipSet
 
 	Stage  SyncStateStage
 	Height uint64
+}
+
+type SyncState struct {
+	ActiveSyncs []ActiveSync
 }
 
 type SyncStateStage int
@@ -270,3 +279,15 @@ const (
 	StageMessages
 	StageSyncComplete
 )
+
+type MpoolChange int
+
+const (
+	MpoolAdd MpoolChange = iota
+	MpoolRemove
+)
+
+type MpoolUpdate struct {
+	Type    MpoolChange
+	Message *types.SignedMessage
+}

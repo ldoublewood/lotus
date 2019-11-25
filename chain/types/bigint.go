@@ -124,21 +124,41 @@ func (bi *BigInt) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (bi *BigInt) Scan(value interface{}) error {
+	switch value := value.(type) {
+	case string:
+		i, ok := big.NewInt(0).SetString(value, 10)
+		if !ok {
+			if value == "<nil>" {
+				return nil
+			}
+			return xerrors.Errorf("failed to parse bigint string: '%s'", value)
+		}
+
+		bi.Int = i
+
+		return nil
+	case int64:
+		bi.Int = big.NewInt(value)
+		return nil
+	default:
+		return xerrors.Errorf("non-string types unsupported: %T", value)
+	}
+}
+
 func (bi *BigInt) cborBytes() []byte {
 	if bi.Int == nil {
 		return []byte{}
 	}
 
 	switch {
-	case bi.Sign() == 0:
-		return []byte{}
 	case bi.Sign() > 0:
 		return append([]byte{0}, bi.Bytes()...)
 	case bi.Sign() < 0:
 		return append([]byte{1}, bi.Bytes()...)
+	default: //  bi.Sign() == 0:
+		return []byte{}
 	}
-
-	panic("unreachable")
 }
 
 func fromCborBytes(buf []byte) (BigInt, error) {

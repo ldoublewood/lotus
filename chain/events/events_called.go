@@ -7,7 +7,6 @@ import (
 
 	"github.com/ipfs/go-cid"
 
-	"github.com/filecoin-project/lotus/chain/address"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -24,7 +23,7 @@ type triggerH = uint64
 
 // `ts` is the tipset, in which the `msg` is included.
 // `curH`-`ts.Height` = `confidence`
-type CalledHandler func(msg *types.Message, ts *types.TipSet, curH uint64) (more bool, err error)
+type CalledHandler func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH uint64) (more bool, err error)
 
 // CheckFunc is used for atomicity guarantees. If the condition the callbacks
 // wait for has already happened in tipset `ts`
@@ -33,6 +32,8 @@ type CalledHandler func(msg *types.Message, ts *types.TipSet, curH uint64) (more
 // If `more` is false, no messages will be sent to CalledHandler (RevertHandler
 //  may still be called)
 type CheckFunc func(ts *types.TipSet) (done bool, more bool, err error)
+
+type MatchFunc func(msg *types.Message) (bool, error)
 
 type callHandler struct {
 	confidence int
@@ -63,8 +64,8 @@ type calledEvents struct {
 
 	ctr triggerId
 
-	triggers   map[triggerId]*callHandler
-	callTuples map[callTuple][]triggerId
+	triggers map[triggerId]*callHandler
+	matchers map[triggerId][]MatchFunc
 
 	// maps block heights to events
 	// [triggerH][msgH][event]
@@ -77,19 +78,12 @@ type calledEvents struct {
 	timeouts map[uint64]map[triggerId]int
 }
 
-type callTuple struct {
-	actor  address.Address
-	method uint64
-}
-
 func (e *calledEvents) headChangeCalled(rev, app []*types.TipSet) error {
 	for _, ts := range rev {
 		e.handleReverts(ts)
 	}
 
-	tail := len(app) - 1
-	for i := range app {
-		ts := app[tail-i]
+	for _, ts := range app {
 		// called triggers
 
 		e.checkNewCalls(ts)
@@ -126,21 +120,27 @@ func (e *calledEvents) handleReverts(ts *types.TipSet) {
 
 func (e *calledEvents) checkNewCalls(ts *types.TipSet) {
 	e.messagesForTs(ts, func(msg *types.Message) {
-		// TODO: do we have to verify the receipt, or are messages on chain
-		//  guaranteed to be successful?
+		// TODO: provide receipts
 
-		ct := callTuple{
-			actor:  msg.To,
-			method: msg.Method,
-		}
+		for tid, matchFns := range e.matchers {
+			var matched bool
+			for _, matchFn := range matchFns {
+				ok, err := matchFn(msg)
+				if err != nil {
+					log.Warnf("event matcher failed: %s")
+					continue
+				}
+				matched = ok
 
-		triggers, ok := e.callTuples[ct]
-		if !ok {
-			return
-		}
+				if matched {
+					break
+				}
+			}
 
-		for _, tid := range triggers {
-			e.queueForConfidence(tid, msg, ts)
+			if matched {
+				e.queueForConfidence(tid, msg, ts)
+				break
+			}
 		}
 	})
 }
@@ -186,7 +186,13 @@ func (e *calledEvents) applyWithConfidence(ts *types.TipSet) {
 				continue
 			}
 
-			more, err := trigger.handle(event.msg, triggerTs, ts.Height())
+			rec, err := e.cs.StateGetReceipt(e.ctx, event.msg.Cid(), ts)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+
+			more, err := trigger.handle(event.msg, rec, triggerTs, ts.Height())
 			if err != nil {
 				log.Errorf("chain trigger (call %s.%d() @H %d, called @ %d) failed: %s", event.msg.To, event.msg.Method, origH, ts.Height(), err)
 				continue // don't revert failed calls
@@ -224,7 +230,7 @@ func (e *calledEvents) applyTimeouts(ts *types.TipSet) {
 			log.Errorf("events: applyTimeouts didn't find tipset for event; wanted %d; current %d", ts.Height()-uint64(trigger.confidence), ts.Height())
 		}
 
-		more, err := trigger.handle(nil, timeoutTs, ts.Height())
+		more, err := trigger.handle(nil, nil, timeoutTs, ts.Height())
 		if err != nil {
 			log.Errorf("chain trigger (call @H %d, called @ %d) failed: %s", timeoutTs.Height(), ts.Height(), err)
 			continue // don't revert failed calls
@@ -292,7 +298,7 @@ func (e *calledEvents) messagesForTs(ts *types.TipSet, consume func(*types.Messa
 //    containing the message. The tipset passed as the argument is the tipset
 //    that is being dropped. Note that the message dropped may be re-applied
 //    in a different tipset in small amount of time.
-func (e *calledEvents) Called(check CheckFunc, hnd CalledHandler, rev RevertHandler, confidence int, timeout uint64, actor address.Address, method uint64) error {
+func (e *calledEvents) Called(check CheckFunc, hnd CalledHandler, rev RevertHandler, confidence int, timeout uint64, mf MatchFunc) error {
 	e.lk.Lock()
 	defer e.lk.Unlock()
 
@@ -317,12 +323,8 @@ func (e *calledEvents) Called(check CheckFunc, hnd CalledHandler, rev RevertHand
 		revert: rev,
 	}
 
-	ct := callTuple{
-		actor:  actor,
-		method: method,
-	}
+	e.matchers[id] = append(e.matchers[id], mf)
 
-	e.callTuples[ct] = append(e.callTuples[ct], id)
 	if timeout != NoTimeout {
 		if e.timeouts[timeout+uint64(confidence)] == nil {
 			e.timeouts[timeout+uint64(confidence)] = map[uint64]int{}
@@ -331,4 +333,8 @@ func (e *calledEvents) Called(check CheckFunc, hnd CalledHandler, rev RevertHand
 	}
 
 	return nil
+}
+
+func (e *calledEvents) CalledMsg(ctx context.Context, hnd CalledHandler, rev RevertHandler, confidence int, timeout uint64, msg *types.Message) error {
+	return e.Called(e.CheckMsg(ctx, msg, hnd), hnd, rev, confidence, timeout, e.MatchMsg(msg))
 }

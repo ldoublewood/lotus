@@ -40,6 +40,14 @@ type fakeCS struct {
 	sub func(rev, app []*types.TipSet)
 }
 
+func (fcs *fakeCS) StateGetReceipt(context.Context, cid.Cid, *types.TipSet) (*types.MessageReceipt, error) {
+	return nil, nil
+}
+
+func (fcs *fakeCS) StateGetActor(ctx context.Context, actor address.Address, ts *types.TipSet) (*types.Actor, error) {
+	panic("Not Implemented")
+}
+
 func (fcs *fakeCS) ChainGetTipSetByHeight(context.Context, uint64, *types.TipSet) (*types.TipSet, error) {
 	panic("Not Implemented")
 }
@@ -57,6 +65,9 @@ func makeTs(t *testing.T, h uint64, msgcid cid.Cid) *types.TipSet {
 			ParentStateRoot:       dummyCid,
 			Messages:              msgcid,
 			ParentMessageReceipts: dummyCid,
+
+			BlockSig:     types.Signature{Type: types.KTBLS},
+			BLSAggregate: types.Signature{Type: types.KTBLS},
 		},
 		{
 			Height: h,
@@ -67,6 +78,9 @@ func makeTs(t *testing.T, h uint64, msgcid cid.Cid) *types.TipSet {
 			ParentStateRoot:       dummyCid,
 			Messages:              msgcid,
 			ParentMessageReceipts: dummyCid,
+
+			BlockSig:     types.Signature{Type: types.KTBLS},
+			BLSAggregate: types.Signature{Type: types.KTBLS},
 		},
 	})
 
@@ -171,10 +185,6 @@ func (fcs *fakeCS) advance(rev, app int, msgs map[int]cid.Cid, nulls ...int) { /
 		}
 
 		apps = append(apps, ts)
-	}
-
-	for i, j := 0, len(apps)-1; i < j; i, j = i+1, j-1 {
-		apps[i], apps[j] = apps[j], apps[i]
 	}
 
 	fcs.sub(revs, apps)
@@ -482,6 +492,12 @@ func TestAtChainedConfidenceNull(t *testing.T) {
 	require.Equal(t, false, reverted)
 }
 
+func matchAddrMethod(to address.Address, m uint64) func(msg *types.Message) (bool, error) {
+	return func(msg *types.Message) (bool, error) {
+		return to == msg.To && m == msg.Method, nil
+	}
+}
+
 func TestCalled(t *testing.T) {
 	fcs := &fakeCS{
 		t: t,
@@ -506,7 +522,7 @@ func TestCalled(t *testing.T) {
 
 	err = events.Called(func(ts *types.TipSet) (d bool, m bool, e error) {
 		return false, true, nil
-	}, func(msg *types.Message, ts *types.TipSet, curH uint64) (bool, error) {
+	}, func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH uint64) (bool, error) {
 		require.Equal(t, false, applied)
 		applied = true
 		appliedMsg = msg
@@ -516,7 +532,7 @@ func TestCalled(t *testing.T) {
 	}, func(_ context.Context, ts *types.TipSet) error {
 		reverted = true
 		return nil
-	}, 3, 20, t0123, 5)
+	}, 3, 20, matchAddrMethod(t0123, 5))
 	require.NoError(t, err)
 
 	// create few blocks to make sure nothing get's randomly called
@@ -701,7 +717,7 @@ func TestCalledTimeout(t *testing.T) {
 
 	err = events.Called(func(ts *types.TipSet) (d bool, m bool, e error) {
 		return false, true, nil
-	}, func(msg *types.Message, ts *types.TipSet, curH uint64) (bool, error) {
+	}, func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH uint64) (bool, error) {
 		called = true
 		require.Nil(t, msg)
 		require.Equal(t, uint64(20), ts.Height())
@@ -710,7 +726,7 @@ func TestCalledTimeout(t *testing.T) {
 	}, func(_ context.Context, ts *types.TipSet) error {
 		t.Fatal("revert on timeout")
 		return nil
-	}, 3, 20, t0123, 5)
+	}, 3, 20, matchAddrMethod(t0123, 5))
 	require.NoError(t, err)
 
 	fcs.advance(0, 21, nil)
@@ -736,7 +752,7 @@ func TestCalledTimeout(t *testing.T) {
 
 	err = events.Called(func(ts *types.TipSet) (d bool, m bool, e error) {
 		return true, true, nil
-	}, func(msg *types.Message, ts *types.TipSet, curH uint64) (bool, error) {
+	}, func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH uint64) (bool, error) {
 		called = true
 		require.Nil(t, msg)
 		require.Equal(t, uint64(20), ts.Height())
@@ -745,7 +761,7 @@ func TestCalledTimeout(t *testing.T) {
 	}, func(_ context.Context, ts *types.TipSet) error {
 		t.Fatal("revert on timeout")
 		return nil
-	}, 3, 20, t0123, 5)
+	}, 3, 20, matchAddrMethod(t0123, 5))
 	require.NoError(t, err)
 
 	fcs.advance(0, 21, nil)
@@ -775,7 +791,7 @@ func TestCalledOrder(t *testing.T) {
 
 	err = events.Called(func(ts *types.TipSet) (d bool, m bool, e error) {
 		return false, true, nil
-	}, func(msg *types.Message, ts *types.TipSet, curH uint64) (bool, error) {
+	}, func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH uint64) (bool, error) {
 		switch at {
 		case 0:
 			require.Equal(t, uint64(1), msg.Nonce)
@@ -799,7 +815,7 @@ func TestCalledOrder(t *testing.T) {
 		}
 		at++
 		return nil
-	}, 3, 20, t0123, 5)
+	}, 3, 20, matchAddrMethod(t0123, 5))
 	require.NoError(t, err)
 
 	fcs.advance(0, 10, map[int]cid.Cid{

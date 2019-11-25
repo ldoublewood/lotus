@@ -200,7 +200,7 @@ func Online() Option {
 			Override(new(dtypes.ClientDAG), testing.MemoryClientDag),
 
 			// Filecoin services
-			Override(new(*chain.Syncer), chain.NewSyncer),
+			Override(new(*chain.Syncer), modules.NewSyncer),
 			Override(new(*blocksync.BlockSync), blocksync.NewBlockSyncClient),
 			Override(new(*chain.MessagePool), modules.MessagePool),
 
@@ -312,6 +312,9 @@ func ConfigFullNode(c interface{}) Option {
 	return Options(
 		ConfigCommon(&cfg.Common),
 		Override(HeadMetricsKey, metrics.SendHeadNotifs(cfg.Metrics.Nickname)),
+		If(cfg.Metrics.PubsubTracing,
+			Override(new(*pubsub.PubSub), lp2p.GossipSub(lp2p.PubsubTracer())),
+		),
 	)
 }
 

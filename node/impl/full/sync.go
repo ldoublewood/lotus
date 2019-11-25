@@ -20,13 +20,19 @@ type SyncAPI struct {
 }
 
 func (a *SyncAPI) SyncState(ctx context.Context) (*api.SyncState, error) {
-	ss := a.Syncer.State()
-	return &api.SyncState{
-		Base:   ss.Base,
-		Target: ss.Target,
-		Stage:  ss.Stage,
-		Height: ss.Height,
-	}, nil
+	states := a.Syncer.State()
+
+	out := &api.SyncState{}
+
+	for _, ss := range states {
+		out.ActiveSyncs = append(out.ActiveSyncs, api.ActiveSync{
+			Base:   ss.Base,
+			Target: ss.Target,
+			Stage:  ss.Stage,
+			Height: ss.Height,
+		})
+	}
+	return out, nil
 }
 
 func (a *SyncAPI) SyncSubmitBlock(ctx context.Context, blk *types.BlockMsg) error {
@@ -48,7 +54,7 @@ func (a *SyncAPI) SyncSubmitBlock(ctx context.Context, blk *types.BlockMsg) erro
 	}
 
 	if err := a.Syncer.ValidateMsgMeta(fb); err != nil {
-		xerrors.Errorf("provided messages did not match block: %w", err)
+		return xerrors.Errorf("provided messages did not match block: %w", err)
 	}
 
 	ts, err := types.NewTipSet([]*types.BlockHeader{blk.Header})
@@ -66,4 +72,8 @@ func (a *SyncAPI) SyncSubmitBlock(ctx context.Context, blk *types.BlockMsg) erro
 
 	// TODO: anything else to do here?
 	return a.PubSub.Publish("/fil/blocks", b)
+}
+
+func (a *SyncAPI) SyncIncomingBlocks(ctx context.Context) (<-chan *types.BlockHeader, error) {
+	return a.Syncer.IncomingBlocks(ctx)
 }
