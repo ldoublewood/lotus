@@ -26,6 +26,16 @@ var initCmd = &cli.Command{
 	Usage: "Initialize a lotus storage miner repo",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
+			Name:  "fullnode-api",
+			EnvVars: []string{"FULLNODE_API"},
+			Value: "",
+		},
+		&cli.StringFlag{
+			Name:  "fullnode-token",
+			EnvVars: []string{"FULLNODE_TOKEN"},
+			Value: "",
+		},
+		&cli.StringFlag{
 			Name:  "actor",
 			Usage: "specify the address of an already created miner actor",
 		},
