@@ -150,6 +150,7 @@ func (fsr *FsRepo) initKeystore() error {
 	return os.Mkdir(kstorePath, 0700)
 }
 
+
 // APIEndpoint returns endpoint of API in this repo
 func (fsr *FsRepo) APIEndpoint() (multiaddr.Multiaddr, error) {
 	p := filepath.Join(fsr.path, fsAPI)

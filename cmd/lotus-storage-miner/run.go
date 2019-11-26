@@ -27,6 +27,16 @@ var runCmd = &cli.Command{
 	Usage: "Start a lotus storage miner process",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
+			Name:  "fullnode-api",
+			EnvVars: []string{"FULLNODE_API"},
+			Value: "",
+		},
+		&cli.StringFlag{
+			Name:  "fullnode-token",
+			EnvVars: []string{"FULLNODE_TOKEN"},
+			Value: "",
+		},
+		&cli.StringFlag{
 			Name:  "api",
 			Value: "",
 		},
