@@ -100,10 +100,6 @@ func GetFullNodeAPI(ctx *cli.Context) (api.FullNode, jsonrpc.ClientCloser, error
 		addr, headers, err = getAPIByAddrToken(fullnode, token)
 	}
 
-	log.Infof("addr: %s", addr)
-	log.Infof("header: %s", headers.Get("authorization"))
-
-
 	if err != nil {
 		return nil, nil, err
 	}
