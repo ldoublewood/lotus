@@ -62,12 +62,15 @@ EXPOSE 5678
 
 # Create the home directory and switch to a non-privileged user.
 ENV HOME_PATH /data
-RUN mkdir -p $LOTUS_PATH \
+ENV PARAMCACHE_PATH /var/tmp/filecoin-proof-parameters
+
+RUN mkdir -p $HOME_PATH \
   && adduser -D -h $HOME_PATH -u 1000 -G users lotus \
   && chown lotus:users $HOME_PATH
 
 
 VOLUME $HOME_PATH
+VOLUME $PARAMCACHE_PATH
 
 
 # Execute the daemon subcommand by default
