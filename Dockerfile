@@ -1,4 +1,4 @@
-FROM golang:1.12-stretch
+FROM golang:1.13.4-stretch
 MAINTAINER ldoublewood <ldoublewood@gmail.com>
 
 ENV SRC_DIR /lotus
