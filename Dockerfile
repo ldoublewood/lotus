@@ -24,6 +24,9 @@ RUN set -x \
 
 # Download packages first so they can be cached.
 COPY go.mod go.sum $SRC_DIR/
+
+COPY extern/ $SRC_DIR/extern/
+
 RUN cd $SRC_DIR \
   && go mod download
 
