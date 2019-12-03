@@ -1,38 +1,71 @@
-FROM golang:1.13.4
+FROM golang:1.12-stretch
+MAINTAINER ldoublewood <ldoublewood@gmail.com>
 
-ENV VERSION 1.0
+ENV SRC_DIR /lotus
 
-WORKDIR /workdir
-
-# for those in China
-#RUN mv /etc/apt/sources.list /etc/apt/sources.list.bak && \
-#    echo "deb http://mirrors.163.com/debian/ buster main non-free contrib" >/etc/apt/sources.list && \
-#    echo "deb http://mirrors.163.com/debian/ buster-proposed-updates main non-free contrib" >>/etc/apt/sources.list && \
-#    echo "deb-src http://mirrors.163.com/debian/ buster main non-free contrib" >>/etc/apt/sources.list && \
-#    echo "deb-src http://mirrors.163.com/debian/ buster-proposed-updates main non-free contrib" >>/etc/apt/sources.list
-
-RUN apt update -y && apt install -y llvm clang libclang-dev mesa-opencl-icd ocl-icd-opencl-dev
+RUN apt-get update && apt-get install -y && apt-get install -y ca-certificates llvm clang mesa-opencl-icd ocl-icd-opencl-dev
 
 RUN curl -sSf https://sh.rustup.rs | sh -s -- -y
 
-RUN mkdir /workdir/src
 
-COPY go.mod go.sum src/
+# Get su-exec, a very minimal tool for dropping privileges,
+# and tini, a very minimal init daemon for containers
+ENV SUEXEC_VERSION v0.2
+ENV TINI_VERSION v0.16.1
+RUN set -x \
+  && cd /tmp \
+  && git clone https://github.com/ncopa/su-exec.git \
+  && cd su-exec \
+  && git checkout -q $SUEXEC_VERSION \
+  && make \
+  && cd /tmp \
+  && wget -q -O tini https://github.com/krallin/tini/releases/download/$TINI_VERSION/tini \
+  && chmod +x tini
 
-COPY extern/ src/extern/
+# Download packages first so they can be cached.
+COPY go.mod go.sum $SRC_DIR/
+RUN cd $SRC_DIR \
+  && go mod download
 
-# for those in China
-#RUN go env -w GOPROXY=https://goproxy.cn,direct
-#RUN go env -w GOSUMDB="sum.golang.google.cn"
+COPY . $SRC_DIR
 
-RUN cd src &&  go mod download
+# Build the thing.
+RUN cd $SRC_DIR \
+  && make
 
-    
-COPY . src
 
-#ARG HTTP_PROXY=172.17.0.1:8118
-RUN . $HOME/.cargo/env && cd src && make && cp lotus lotus-storage-miner ../
 
-RUN rm -rf src
+# Now comes the actual target image, which aims to be as small as possible.
+FROM busybox:1-glibc
+MAINTAINER ldoublewood <ldoublewood@gmail.com>
 
-CMD ["/workdir/src/lotus","daemon"]
+# Get the ipfs binary, entrypoint script, and TLS CAs from the build container.
+ENV SRC_DIR /lotus
+COPY --from=0 $SRC_DIR/lotus /usr/local/bin/lotus
+COPY --from=0 $SRC_DIR/lotus-storage-miner /usr/local/bin/lotus-storage-miner
+COPY --from=0 /tmp/su-exec/su-exec /sbin/su-exec
+COPY --from=0 /tmp/tini /sbin/tini
+COPY --from=0 /etc/ssl/certs /etc/ssl/certs
+
+
+# This shared lib (part of glibc) doesn't seem to be included with busybox.
+COPY --from=0 /lib/x86_64-linux-gnu/libdl-2.24.so /lib/libdl.so.2
+
+# WS port
+EXPOSE 1234
+# P2P port
+EXPOSE 5678
+
+
+# Create the home directory and switch to a non-privileged user.
+ENV HOME_PATH /data
+RUN mkdir -p $LOTUS_PATH \
+  && adduser -D -h $HOME_PATH -u 1000 -G users lotus \
+  && chown lotus:users $HOME_PATH
+
+
+VOLUME $HOME_PATH
+
+
+# Execute the daemon subcommand by default
+CMD ["/sbin/tini", "--", "lotus", "daemon"]
