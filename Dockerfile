@@ -34,7 +34,7 @@ COPY . $SRC_DIR
 
 # Build the thing.
 RUN cd $SRC_DIR \
-  && . $HOME/.cargo/env && \
+  && . $HOME/.cargo/env \
   && make
 
 
