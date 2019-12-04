@@ -1,4 +1,4 @@
-FROM golang:1.13.4-stretch
+FROM golang:1.13.4-buster
 MAINTAINER ldoublewood <ldoublewood@gmail.com>
 
 ENV SRC_DIR /lotus
@@ -30,14 +30,22 @@ COPY extern/ $SRC_DIR/extern/
 RUN cd $SRC_DIR \
   && go mod download
 
+COPY Makefile $SRC_DIR
+COPY .git/ $SRC_DIR/.git/
+COPY .gitmodules $SRC_DIR/
+
+RUN cd $SRC_DIR \
+  && mkdir $SRC_DIR/build \
+  && . $HOME/.cargo/env \
+  && make clean \
+  && make deps
+
 COPY . $SRC_DIR
 
 # Build the thing.
 RUN cd $SRC_DIR \
   && . $HOME/.cargo/env \
   && make
-
-
 
 # Now comes the actual target image, which aims to be as small as possible.
 FROM busybox:1-glibc
@@ -53,7 +61,10 @@ COPY --from=0 /etc/ssl/certs /etc/ssl/certs
 
 
 # This shared lib (part of glibc) doesn't seem to be included with busybox.
-COPY --from=0 /lib/x86_64-linux-gnu/libdl-2.24.so /lib/libdl.so.2
+COPY --from=0 /lib/x86_64-linux-gnu/libdl-2.28.so /lib/libdl.so.2
+COPY --from=0 /lib/x86_64-linux-gnu/libutil-2.28.so /lib/libutil.so.1 
+COPY --from=0 /usr/lib/x86_64-linux-gnu/libOpenCL.so.1.0.0 /lib/libOpenCL.so.1
+COPY --from=0 /lib/x86_64-linux-gnu/librt-2.28.so /lib/librt.so.1
 
 # WS port
 EXPOSE 1234
@@ -72,7 +83,6 @@ RUN mkdir -p $HOME_PATH \
 
 VOLUME $HOME_PATH
 VOLUME $PARAMCACHE_PATH
-
 
 # Execute the daemon subcommand by default
 CMD ["/sbin/tini", "--", "lotus", "daemon"]
