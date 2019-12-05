@@ -122,7 +122,6 @@ func GetFullNodeAPI(ctx *cli.Context) (api.FullNode, jsonrpc.ClientCloser, error
 		addr, headers, err = getAPIByAddrToken(fullnode, token)
 	}
 
->>>>>>> add docker support
 	if err != nil {
 		return nil, nil, err
 	}
