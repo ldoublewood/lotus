@@ -11,7 +11,7 @@ RUN curl -sSf https://sh.rustup.rs | sh -s -- -y
 # Get su-exec, a very minimal tool for dropping privileges,
 # and tini, a very minimal init daemon for containers
 ENV SUEXEC_VERSION v0.2
-ENV TINI_VERSION v0.16.1
+ENV TINI_VERSION v0.18.0
 RUN set -x \
   && cd /tmp \
   && git clone https://github.com/ncopa/su-exec.git \
@@ -24,21 +24,23 @@ RUN set -x \
 
 # Download packages first so they can be cached.
 COPY go.mod go.sum $SRC_DIR/
-
 COPY extern/ $SRC_DIR/extern/
-
 RUN cd $SRC_DIR \
   && go mod download
 
 COPY Makefile $SRC_DIR
+
+# Because extern/filecoin-ffi building script need to get version number from git
 COPY .git/ $SRC_DIR/.git/
 COPY .gitmodules $SRC_DIR/
 
+# Download dependence first
 RUN cd $SRC_DIR \
   && mkdir $SRC_DIR/build \
   && . $HOME/.cargo/env \
   && make clean \
   && make deps
+
 
 COPY . $SRC_DIR
 
@@ -51,7 +53,7 @@ RUN cd $SRC_DIR \
 FROM busybox:1-glibc
 MAINTAINER ldoublewood <ldoublewood@gmail.com>
 
-# Get the ipfs binary, entrypoint script, and TLS CAs from the build container.
+# Get the executable binary and TLS CAs from the build container.
 ENV SRC_DIR /lotus
 COPY --from=0 $SRC_DIR/lotus /usr/local/bin/lotus
 COPY --from=0 $SRC_DIR/lotus-storage-miner /usr/local/bin/lotus-storage-miner
