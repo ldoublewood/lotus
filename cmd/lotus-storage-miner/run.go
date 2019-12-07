@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	mux "github.com/gorilla/mux"
 	"github.com/multiformats/go-multiaddr"
@@ -40,6 +41,11 @@ var runCmd = &cli.Command{
 		&cli.BoolFlag{
 			Name:  "nosync",
 			Usage: "don't check full-node sync status",
+		},
+		&cli.IntFlag{
+			Name:  "store-garbage",
+			Usage: "auto store random data in sectors, max progress sectors number",
+			Value: 0,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -157,6 +163,51 @@ var runCmd = &cli.Command{
 			log.Warn("Graceful shutdown successful")
 		}()
 		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+
+		garbage := cctx.Int("store-garbage")
+		if garbage > 0 {
+			go func() {
+				log.Infof("Begin store garbage")
+				nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+				if err != nil {
+					log.Errorf("garbage: get sector list fail: %s", err)
+					return
+				}
+				defer closer()
+				ctx := lcli.ReqContext(cctx)
+				for {
+					select {
+					case <-ctx.Done():
+						log.Infof("End store garbage")
+						return
+					case <-time.After(build.FallbackPoStDelay * time.Second):
+					}
+					sectors, err := nodeApi.SectorsList(ctx)
+					if err != nil {
+						log.Errorf("garbage: get sector list fail: %s", err)
+						return
+					}
+					waitNum := 0
+
+					for _, s := range sectors {
+						st, err := nodeApi.SectorsStatus(ctx, s)
+						if err != nil {
+							log.Errorf("garbage: get sector status fail: %s", err)
+							break
+						}
+						if st.State == api.Unsealed || st.State == api.PreCommitting ||
+							st.State == api.PreCommitted || st.State == api.Committing ||
+							st.State == api.CommitWait {
+							waitNum++
+						}
+					}
+					log.Infof("garbage: %d/%d sectors", waitNum, garbage)
+					if waitNum < garbage {
+						nodeApi.StoreGarbageData(ctx)
+					}
+				}
+			}()
+		}
 
 		return srv.Serve(manet.NetListener(lst))
 	},
