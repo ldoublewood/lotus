@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-sectorbuilder"
 )
@@ -88,6 +87,9 @@ type StorageMiner interface {
 
 	// Temp api for testing
 	PledgeSector(context.Context) error
+
+	SetPledgeSectorMode(context.Context, string)
+	GetPledgeSectorMode(context.Context) string
 
 	// Get the status of a given sector by ID
 	SectorsStatus(context.Context, uint64) (SectorInfo, error)
