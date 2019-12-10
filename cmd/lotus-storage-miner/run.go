@@ -170,7 +170,7 @@ var runCmd = &cli.Command{
 				log.Infof("Begin pledge sector")
 				nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
 				if err != nil {
-					log.Errorf("pledge: GetStorageMinerAPI fail: %s", err)
+					log.Errorf("Pledge: GetStorageMinerAPI fail: %w", err)
 					return
 				}
 				defer closer()
@@ -185,14 +185,19 @@ var runCmd = &cli.Command{
 
 					wstat, err := nodeApi.WorkerStats(ctx)
 					if err != nil {
-						log.Errorf("pledge: WorkerStats fail: %s", err)
+						log.Errorf("Pledge: WorkerStats fail: %w", err)
 						return
 					}
 
-					log.Infof("pledge: %d/%d workers", wstat.LocalFree + wstat.RemotesFree,
+					log.Infof("Pledge: %d/%d workers", wstat.LocalFree + wstat.RemotesFree,
 						wstat.LocalTotal + wstat.RemotesTotal - wstat.LocalReserved)
 					if wstat.LocalFree + wstat.RemotesFree > 0 {
-						nodeApi.PledgeSector(ctx)
+						err = nodeApi.PledgeSector(ctx)
+						if err != nil {
+							log.Errorf("Pledge sector error: %w", err)
+						} else {
+							log.Infof("Success pledge sector")
+						}
 					}
 				}
 			}()
