@@ -57,6 +57,7 @@ MAINTAINER ldoublewood <ldoublewood@gmail.com>
 ENV SRC_DIR /lotus
 COPY --from=0 $SRC_DIR/lotus /usr/local/bin/lotus
 COPY --from=0 $SRC_DIR/lotus-storage-miner /usr/local/bin/lotus-storage-miner
+COPY --from=0 $SRC_DIR/lotus-helper /usr/local/bin/helper
 COPY --from=0 /tmp/su-exec/su-exec /sbin/su-exec
 COPY --from=0 /tmp/tini /sbin/tini
 COPY --from=0 /etc/ssl/certs /etc/ssl/certs
