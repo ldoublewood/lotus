@@ -111,30 +111,24 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 	return out, nil
 }
 
-func (m *Miner) PledgeSector() error {
-	go func() {
-		ctx := context.TODO() // we can't use the context from command which invokes
-		// this, as we run everything here async, and it's cancelled when the
-		// command exits
+func (m *Miner) PledgeSector(ctx context.Context) error {
+	size := sectorbuilder.UserBytesForSectorSize(m.sb.SectorSize())
 
-		size := sectorbuilder.UserBytesForSectorSize(m.sb.SectorSize())
+	sid, err := m.sb.AcquireSectorId()
+	if err != nil {
+		log.Errorf("%+v", err)
+		return err
+	}
 
-		sid, err := m.sb.AcquireSectorId()
-		if err != nil {
-			log.Errorf("%+v", err)
-			return
-		}
+	pieces, err := m.pledgeSector(ctx, sid, []uint64{}, size)
+	if err != nil {
+		log.Errorf("%+v", err)
+		return err
+	}
 
-		pieces, err := m.pledgeSector(ctx, sid, []uint64{}, size)
-		if err != nil {
-			log.Errorf("%+v", err)
-			return
-		}
-
-		if err := m.newSector(context.TODO(), sid, pieces[0].DealID, pieces[0].ppi()); err != nil {
-			log.Errorf("%+v", err)
-			return
-		}
-	}()
+	if err := m.newSector(ctx, sid, pieces[0].DealID, pieces[0].ppi()); err != nil {
+		log.Errorf("%+v", err)
+		return err
+	}
 	return nil
 }
