@@ -70,7 +70,14 @@ lotus-seal-worker: $(BUILD_DEPS)
 .PHONY: lotus-seal-worker
 BINS+=lotus-seal-worker
 
-build: lotus lotus-storage-miner
+lotus-starter: $(BUILD_DEPS)
+	rm -f lotus-starter
+	go build $(GOFLAGS) -o lotus-starter ./cmd/lotus-starter
+	go run github.com/GeertJohan/go.rice/rice append --exec lotus-starter -i ./build
+.PHONY: lotus-starter
+BINS+=lotus-starter
+
+build: lotus lotus-storage-miner lotus-starter
 .PHONY: build
 
 install:
