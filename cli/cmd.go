@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"github.com/multiformats/go-multiaddr"
 	"net/http"
 	"os"
 	"os/signal"
