@@ -30,6 +30,18 @@ var runCmd = &cli.Command{
 	Usage: "Start a lotus storage miner process",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
+			Name:  "fullnode-api",
+			EnvVars: []string{"FULLNODE_API"},
+			Usage: "Address of full node RPC, e.g. /ip4/127.0.0.1/tcp/1234/http",
+			Value: "",
+		},
+		&cli.StringFlag{
+			Name:  "fullnode-token",
+			EnvVars: []string{"FULLNODE_TOKEN"},
+			Usage: "Token to access full node RPC",
+			Value: "",
+		},
+		&cli.StringFlag{
 			Name:  "api",
 			Value: "2345",
 		},

@@ -22,7 +22,7 @@ FFI_DEPS:=$(addprefix $(FFI_PATH),$(FFI_DEPS))
 $(FFI_DEPS): build/.filecoin-install ;
 
 build/.filecoin-install: $(FFI_PATH)
-	$(MAKE) -C $(FFI_PATH) $(FFI_DEPS:$(FFI_PATH)%=%)
+	FFI_BUILD_FROM_SOURCE=1 $(MAKE) -C $(FFI_PATH) $(FFI_DEPS:$(FFI_PATH)%=%)
 	@touch $@
 
 MODULES+=$(FFI_PATH)
@@ -70,7 +70,15 @@ lotus-seal-worker: $(BUILD_DEPS)
 .PHONY: lotus-seal-worker
 BINS+=lotus-seal-worker
 
-build: lotus lotus-storage-miner lotus-seal-worker
+lotus-helper: $(BUILD_DEPS)
+	rm -f lotus-helper
+	go build $(GOFLAGS) -o lotus-helper ./cmd/lotus-helper
+	go run github.com/GeertJohan/go.rice/rice append --exec lotus-helper -i ./build
+.PHONY: lotus-helper
+BINS+=lotus-helper
+
+build: lotus lotus-storage-miner  lotus-seal-worker lotus-helper
+
 .PHONY: build
 
 install:
