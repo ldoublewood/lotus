@@ -51,6 +51,11 @@ var DaemonCmd = &cli.Command{
 			Name:   "genesis-timestamp",
 			Hidden: true,
 			Usage:  "set the timestamp for the genesis block that will be created",
+                },
+		&cli.StringFlag{
+			Name:  "fullnode-listen-addr",
+			EnvVars: []string{"FULLNODE_LISTEN_ADDR"},
+			Value: "",
 		},
 		&cli.BoolFlag{
 			Name:  "bootstrap",
@@ -119,8 +124,13 @@ var DaemonCmd = &cli.Command{
 		if err != nil {
 			return xerrors.Errorf("initializing node: %w", err)
 		}
-
-		endpoint, err := r.APIEndpoint()
+		var endpoint multiaddr.Multiaddr
+		fullnode := cctx.String("fullnode-listen-addr")
+		if len(fullnode) == 0 {
+			endpoint, err = r.APIEndpoint()
+		} else {
+			endpoint, err = multiaddr.NewMultiaddr(fullnode)
+		}
 		if err != nil {
 			return xerrors.Errorf("getting api endpoint: %w", err)
 		}
