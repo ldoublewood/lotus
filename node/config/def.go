@@ -64,8 +64,24 @@ func defCommon() Common {
 		},
 		Libp2p: Libp2p{
 			ListenAddresses: []string{
-				"/ip4/0.0.0.0/tcp/0",
-				"/ip6/::/tcp/0",
+				"/ip4/0.0.0.0/tcp/5678",
+				"/ip6/::/tcp/5678",
+			},
+		},
+	}
+
+}
+
+func defStorageMinerCommon() Common {
+	return Common{
+		API: API{
+			ListenAddress: "/ip4/127.0.0.1/tcp/1234/http",
+			Timeout:       Duration(30 * time.Second),
+		},
+		Libp2p: Libp2p{
+			ListenAddresses: []string{
+				"/ip4/0.0.0.0/tcp/7890",
+				"/ip6/::/tcp/7890",
 			},
 		},
 	}
@@ -81,7 +97,7 @@ func DefaultFullNode() *FullNode {
 
 func DefaultStorageMiner() *StorageMiner {
 	cfg := &StorageMiner{
-		Common: defCommon(),
+		Common: defStorageMinerCommon(),
 
 		SectorBuilder: SectorBuilder{
 			WorkerCount: 5,
