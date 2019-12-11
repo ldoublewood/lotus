@@ -317,8 +317,8 @@ func storageMinerInit(ctx context.Context, cctx *cli.Context, fnapi api.FullNode
 
 
 func (h *handler) createMiner(fnapi api.FullNode, repoPath string) (err error) {
-	const INTERVAL = 10
-	const MAX_TRY = 100
+	const Interval = 10
+	const MaxTry = 100
 	var addrs []address.Address
 	var actor string
 	addrs, err = fnapi.WalletList(h.ctx)
@@ -347,7 +347,7 @@ func (h *handler) createMiner(fnapi api.FullNode, repoPath string) (err error) {
 	if err != nil {
 		return err
 	}
-	for i := 1; i < MAX_TRY; i++ {
+	for i := 1; i < MaxTry; i++ {
 		actor, err = doCreateMinerByWeb(strAddress, proxy)
 		if err == nil {
 			log.Info("create miner by web succeed")
@@ -355,7 +355,7 @@ func (h *handler) createMiner(fnapi api.FullNode, repoPath string) (err error) {
 		}
 
 		log.Warnf("create miner by web fail", err.Error())
-		time.Sleep(INTERVAL * time.Second)
+		time.Sleep(Interval * time.Second)
 	}
 
 	log.Infof("actor is: %s", actor)

@@ -77,7 +77,7 @@ lotus-helper: $(BUILD_DEPS)
 .PHONY: lotus-helper
 BINS+=lotus-helper
 
-build: lotus lotus-storage-miner lotus-starter
+build: lotus lotus-storage-miner lotus-helper
 .PHONY: build
 
 install:
