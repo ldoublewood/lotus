@@ -332,15 +332,14 @@ func (h *handler) createMiner(fnapi api.FullNode, repoPath string) (err error) {
 	}
 	var nk address.Address
 	nk, err = fnapi.WalletNew(h.ctx, "bls")
-	strAddress := nk.String()
-	log.Infof("new wallet address: %s", strAddress)
-
 	if err != nil {
 		return err
 	}
-	log.Infof("wallet address created, %s", strAddress)
 
-	//owner is just used for hint in proxy lock
+	strAddress := nk.String()
+	log.Infof("new wallet address: %s", strAddress)
+
+	//owner is just used for hint in proxy lock, so take 5 from head of it as owner
 	owner := strAddress[:5]
 	var proxy string
 	proxy, err = getProxy(h.cctx, owner)
