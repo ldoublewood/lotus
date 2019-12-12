@@ -64,8 +64,8 @@ func defCommon() Common {
 		},
 		Libp2p: Libp2p{
 			ListenAddresses: []string{
-				"/ip4/0.0.0.0/tcp/5678",
-				"/ip6/::/tcp/5678",
+				"/ip4/0.0.0.0/tcp/0",
+				"/ip6/::/tcp/0",
 			},
 		},
 	}
