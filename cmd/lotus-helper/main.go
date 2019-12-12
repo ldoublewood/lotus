@@ -319,6 +319,7 @@ func storageMinerInit(ctx context.Context, cctx *cli.Context, fnapi api.FullNode
 func (h *handler) createMiner(fnapi api.FullNode, repoPath string) (err error) {
 	const Interval = 10
 	const MaxTry = 100
+	const MaxTryGetProxy = 1000
 	var addrs []address.Address
 	var actor string
 	addrs, err = fnapi.WalletList(h.ctx)
@@ -342,11 +343,21 @@ func (h *handler) createMiner(fnapi api.FullNode, repoPath string) (err error) {
 	//owner is just used for hint in proxy lock, so take 5 from head of it as owner
 	owner := strAddress[:5]
 	var proxy string
-	proxy, err = getProxy(h.cctx, owner)
+	for i := 0; i < MaxTryGetProxy; i++ {
+		proxy, err = getProxy(h.cctx, owner)
+		if err == nil {
+			log.Infof("get proxy succeed, %s", proxy)
+			break
+		}
+		log.Warn("get proxy fail, if you are using proxy-fetcher, maybe no available proxy there, please add more proxy")
+		time.Sleep(Interval * time.Second)
+	}
 	if err != nil {
+		log.Warn("all try to get proxy failed")
 		return err
 	}
-	for i := 1; i < MaxTry; i++ {
+
+	for i := 0; i < MaxTry; i++ {
 		actor, err = doCreateMinerByWeb(strAddress, proxy)
 		if err == nil {
 			log.Info("create miner by web succeed")
