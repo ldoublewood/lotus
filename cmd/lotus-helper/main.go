@@ -93,7 +93,7 @@ var runCmd = &cli.Command{
 			Name:    ProxyFetcherAddr,
 			EnvVars: []string{"PROXY_FETCHER_ADDR"},
 			Usage: "proxy fetcher server to create miner by web, disabled when ProxyAddr is set",
-			Value:   "proxy-fetcher",
+			Value:   "proxylock:4433",
 		},
 		&cli.StringFlag{
 			Name:  "listen",
@@ -192,7 +192,7 @@ func doCreateMinerByWeb(address string, proxy string) (actor string, err error) 
 
 	}
 
-	url := "https://lotus-faucet.kittyhawk.wtf/mkminer"
+	url := "https://faucet.testnet.filecoin.io/mkminer"
 	data := "address=" + address + "&sectorSize=1073741824"
 
 
@@ -418,7 +418,7 @@ type WaitResponse struct {
 
 func msgwait(cid string, client *http.Client) (string, error) {
 	var err error
-	url := "https://lotus-faucet.kittyhawk.wtf/msgwaitaddr?cid=" + cid
+	url := "https://faucet.testnet.filecoin.io/msgwaitaddr?cid=" + cid
 	//curl -vvv "https://lotus-faucet.kittyhawk.wtf/msgwaitaddr?cid=bafy2bzaceds2s6scrmycgy7jlfubqnb3jxbiowsopdgjq35ignro4ecd2dv7u"
 
 	var request *http.Request
