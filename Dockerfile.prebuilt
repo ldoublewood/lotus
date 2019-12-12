@@ -17,4 +17,6 @@ COPY ./lotus /workdir/
 
 COPY ./lotus-storage-miner /workdir/
 
+COPY ./lotus-helper /workdir/
+
 CMD ["/workdir/lotus","daemon"]
