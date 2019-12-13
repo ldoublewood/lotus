@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -43,10 +44,10 @@ var runCmd = &cli.Command{
 			Name:  "nosync",
 			Usage: "don't check full-node sync status",
 		},
-		&cli.BoolFlag{
+		&cli.IntFlag{
 			Name:  "pledge-sector",
 			Usage: "auto store random data in sectors",
-			Value: false,
+			Value: -1, // -1 for close, 0 for local/remote, 1 for remote, 2 for local
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -165,7 +166,8 @@ var runCmd = &cli.Command{
 		}()
 		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
-		if cctx.Bool("pledge-sector") {
+		pledge := cctx.Int("pledge-sector")
+		if pledge >= 0 {
 			go func() {
 				log.Infof("Begin pledge sector")
 				nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
@@ -188,17 +190,31 @@ var runCmd = &cli.Command{
 						log.Errorf("Pledge: WorkerStats fail: %w", err)
 						return
 					}
-
-					log.Infof("Pledge: %d/%d workers", wstat.LocalFree + wstat.RemotesFree,
-						wstat.LocalTotal + wstat.RemotesTotal - wstat.LocalReserved)
-					if wstat.LocalFree + wstat.RemotesFree > 0 {
-						err = nodeApi.PledgeSector(ctx)
-						if err != nil {
-							log.Errorf("Pledge sector error: %w", err)
-						} else {
-							log.Infof("Success pledge sector")
-						}
+					log.Infof("Pledge: Local %d / %d (+%d reserved)", wstat.LocalTotal-wstat.LocalReserved-wstat.LocalFree, wstat.LocalTotal-wstat.LocalReserved, wstat.LocalReserved)
+					log.Infof("Pledge: Remote %d / %d", wstat.RemotesTotal-wstat.RemotesFree, wstat.RemotesTotal)
+					threshold := 0
+					if pledge == 0 {
+						threshold = wstat.LocalFree + wstat.RemotesFree
+					} else if pledge == 1 {
+						threshold = wstat.RemotesFree
+					} else if pledge == 2 {
+						threshold = wstat.LocalFree
 					}
+					log.Infof("Pledge: threshold %d", threshold)
+					wg := sync.WaitGroup{}
+					wg.Add(threshold)
+					for ; threshold > 0; threshold-- {
+						go func() {
+							err := nodeApi.PledgeSector(ctx)
+							if err != nil {
+								log.Errorf("Pledge sector error: %w", err)
+							} else {
+								log.Infof("Success pledge sector")
+							}
+							wg.Done()
+						}()
+					}
+					wg.Wait()
 				}
 			}()
 		}
