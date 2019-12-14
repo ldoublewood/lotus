@@ -18,14 +18,13 @@ var pledgeSectorCmd = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "get",
-			Usage: "0 for close, 1 for remote/local, 2 for remote, 3 for local",
+			Usage: "close/all/remote/local",
 			Value: false,
 		},
-		&cli.StringSliceFlag{
+		&cli.StringFlag{
 			Name:  "set",
-			Usage: "0 for close, 1 for remote/local, 2 for remote, 3 for local",
-			Value:  cli.NewStringSlice("close", "all", "remote", "local"),
-			DefaultText: "",
+			Usage: "close/all/remote/local",
+			Value:  "",
 		},
 	},
 	Action: func(cctx *cli.Context) error {

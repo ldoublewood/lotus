@@ -173,7 +173,7 @@ var runCmd = &cli.Command{
 				case <-time.After(build.BlockDelay * time.Second):
 				}
 				pledgeMode := storage.PledgeSectorMode(minerapi.GetPledgeSectorMode(ctx))
-				log.Infof("pledge sector mode: %d", pledgeMode)
+				log.Infof("pledge sector mode: %s", pledgeMode)
 				if pledgeMode == storage.PledgeSectorModeClose {
 					continue
 				}
@@ -197,7 +197,7 @@ var runCmd = &cli.Command{
 				} else if pledgeMode == storage.PledgeSectorModeLocal {
 					threshold = wstat.LocalFree
 				} else {
-					log.Infof("Unknown pledge sector mode: %d", pledgeMode)
+					log.Infof("Unknown pledge sector mode: %s", pledgeMode)
 					continue
 				}
 				log.Infof("Pledge: threshold %d", threshold)

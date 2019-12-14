@@ -151,7 +151,11 @@ func (sm *StorageMinerAPI) PledgeSector(ctx context.Context) error {
 }
 
 func (sm *StorageMinerAPI) SetPledgeSectorMode(ctx context.Context, pledgeMode string) {
-	sm.PledgeSectorMode = storage.PledgeSectorMode(pledgeMode)
+	for _, v := range([]string{"close", "all", "remote", "local"}) {
+		if pledgeMode == v {
+			sm.PledgeSectorMode = storage.PledgeSectorMode(pledgeMode)
+		}
+	}
 }
 
 func (sm *StorageMinerAPI) GetPledgeSectorMode(ctx context.Context) string {
