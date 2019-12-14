@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/filecoin-project/lotus/storage"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -171,9 +172,9 @@ var runCmd = &cli.Command{
 					return
 				case <-time.After(build.BlockDelay * time.Second):
 				}
-				pledgeMode := minerapi.GetPledgeSectorMode()
+				pledgeMode := storage.PledgeSectorMode(minerapi.GetPledgeSectorMode())
 				log.Infof("pledge sector mode: %d", pledgeMode)
-				if pledgeMode == 0 {
+				if pledgeMode == storage.PledgeSectorModeClose {
 					continue
 				}
 
@@ -189,11 +190,11 @@ var runCmd = &cli.Command{
 					continue
 				}
 				threshold := 0
-				if pledgeMode == 1 {
+				if pledgeMode == storage.PledgeSectorModeAll {
 					threshold = wstat.LocalFree + wstat.RemotesFree
-				} else if pledgeMode == 2 {
+				} else if pledgeMode == storage.PledgeSectorModeRemote {
 					threshold = wstat.RemotesFree
-				} else if pledgeMode == 3 {
+				} else if pledgeMode == storage.PledgeSectorModeLocal {
 					threshold = wstat.LocalFree
 				} else {
 					log.Infof("Unknown pledge sector mode: %d", pledgeMode)
