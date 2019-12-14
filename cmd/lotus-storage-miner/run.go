@@ -44,11 +44,6 @@ var runCmd = &cli.Command{
 			Name:  "nosync",
 			Usage: "don't check full-node sync status",
 		},
-		&cli.IntFlag{
-			Name:  "pledge-sector",
-			Usage: "auto store random data in sectors",
-			Value: -1, // -1 for close, 0 for local/remote, 1 for remote, 2 for local
-		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if !cctx.Bool("enable-gpu-proving") {
@@ -166,58 +161,61 @@ var runCmd = &cli.Command{
 		}()
 		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
-		pledge := cctx.Int("pledge-sector")
-		if pledge >= 0 {
-			go func() {
-				log.Infof("Begin pledge sector")
-				nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		go func() {
+			log.Infof("Begin pledge sector")
+			ctx := lcli.ReqContext(cctx)
+			for {
+				select {
+				case <-ctx.Done():
+					log.Infof("End pledge sector")
+					return
+				case <-time.After(build.BlockDelay * time.Second):
+				}
+				pledgeMode := minerapi.GetPledgeSectorMode()
+				log.Infof("pledge sector mode: %d", pledgeMode)
+				if pledgeMode == 0 {
+					continue
+				}
+
+				wstat, err := minerapi.WorkerStats(ctx)
 				if err != nil {
-					log.Errorf("Pledge: GetStorageMinerAPI fail: %w", err)
+					log.Errorf("Pledge: WorkerStats fail: %w", err)
 					return
 				}
-				defer closer()
-				ctx := lcli.ReqContext(cctx)
-				for {
-					select {
-					case <-ctx.Done():
-						log.Infof("End pledge sector")
-						return
-					case <-time.After(build.FallbackPoStDelay * time.Second):
-					}
-
-					wstat, err := nodeApi.WorkerStats(ctx)
-					if err != nil {
-						log.Errorf("Pledge: WorkerStats fail: %w", err)
-						return
-					}
-					log.Infof("Pledge: Local %d / %d (+%d reserved)", wstat.LocalTotal-wstat.LocalReserved-wstat.LocalFree, wstat.LocalTotal-wstat.LocalReserved, wstat.LocalReserved)
-					log.Infof("Pledge: Remote %d / %d", wstat.RemotesTotal-wstat.RemotesFree, wstat.RemotesTotal)
-					threshold := 0
-					if pledge == 0 {
-						threshold = wstat.LocalFree + wstat.RemotesFree
-					} else if pledge == 1 {
-						threshold = wstat.RemotesFree
-					} else if pledge == 2 {
-						threshold = wstat.LocalFree
-					}
-					log.Infof("Pledge: threshold %d", threshold)
-					wg := sync.WaitGroup{}
-					wg.Add(threshold)
-					for ; threshold > 0; threshold-- {
-						go func() {
-							err := nodeApi.PledgeSector(ctx)
-							if err != nil {
-								log.Errorf("Pledge sector error: %w", err)
-							} else {
-								log.Infof("Success pledge sector")
-							}
-							wg.Done()
-						}()
-					}
-					wg.Wait()
+				log.Infof("Pledge: Local %d / %d (+%d reserved)", wstat.LocalTotal-wstat.LocalReserved-wstat.LocalFree, wstat.LocalTotal-wstat.LocalReserved, wstat.LocalReserved)
+				log.Infof("Pledge: Remote %d / %d", wstat.RemotesTotal-wstat.RemotesFree, wstat.RemotesTotal)
+				if wstat.AddPieceWait + wstat.UnsealWait + wstat.PreCommitWait + wstat.CommitWait > wstat.LocalTotal + wstat.RemotesTotal {
+					log.Infof("Pledge: too many queueing")
+					continue
 				}
-			}()
-		}
+				threshold := 0
+				if pledgeMode == 1 {
+					threshold = wstat.LocalFree + wstat.RemotesFree
+				} else if pledgeMode == 2 {
+					threshold = wstat.RemotesFree
+				} else if pledgeMode == 3 {
+					threshold = wstat.LocalFree
+				} else {
+					log.Infof("Unknown pledge sector mode: %d", pledgeMode)
+					continue
+				}
+				log.Infof("Pledge: threshold %d", threshold)
+				wg := sync.WaitGroup{}
+				wg.Add(threshold)
+				for ; threshold > 0; threshold-- {
+					go func() {
+						err := minerapi.PledgeSector(ctx)
+						if err != nil {
+							log.Errorf("Pledge sector error: %w", err)
+						} else {
+							log.Infof("Success pledge sector")
+						}
+						wg.Done()
+					}()
+				}
+				wg.Wait()
+			}
+		}()
 
 		return srv.Serve(manet.NetListener(lst))
 	},

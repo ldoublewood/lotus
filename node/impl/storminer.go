@@ -31,6 +31,17 @@ type StorageMinerAPI struct {
 	Miner      *storage.Miner
 	BlockMiner *miner.Miner
 	Full       api.FullNode
+
+	// 0 for close, 1 for remote/local, 2 for remote, 3 for local
+	PledgeSectorMode int
+}
+
+func (sm *StorageMinerAPI) SetPledgeSectorMode(pledgeMode int) {
+	sm.PledgeSectorMode = pledgeMode
+}
+
+func (sm *StorageMinerAPI) GetPledgeSectorMode() int {
+	return sm.PledgeSectorMode
 }
 
 func (sm *StorageMinerAPI) ServeRemote(w http.ResponseWriter, r *http.Request) {

@@ -15,12 +15,35 @@ import (
 var pledgeSectorCmd = &cli.Command{
 	Name:  "pledge-sector",
 	Usage: "store random data in a sector",
+	Flags: []cli.Flag{
+		&cli.IntFlag{
+			Name:  "set",
+			Usage: "0 for close, 1 for remote/local, 2 for remote, 3 for local",
+			Value: -1,
+		},
+		&cli.BoolFlag{
+			Name:  "get",
+			Usage: "0 for close, 1 for remote/local, 2 for remote, 3 for local",
+			Value: false,
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
 		if err != nil {
 			return err
 		}
 		defer closer()
+		if cctx.Bool("get") {
+			fmt.Println("pledge sector mode: %d", nodeApi.GetPledgeSectorMode())
+			return nil
+		}
+
+		setPledge := cctx.Int("set")
+		if setPledge >= 0 && setPledge <= 3 {
+			nodeApi.SetPledgeSectorMode(setPledge)
+			return nil
+		}
+
 		ctx := lcli.ReqContext(cctx)
 
 		return nodeApi.PledgeSector(ctx)

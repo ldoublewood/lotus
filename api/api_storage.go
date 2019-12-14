@@ -69,6 +69,9 @@ type StorageMiner interface {
 	// Temp api for testing
 	PledgeSector(context.Context) error
 
+	SetPledgeSectorMode(int)
+	GetPledgeSectorMode() int
+
 	// Get the status of a given sector by ID
 	SectorsStatus(context.Context, uint64) (SectorInfo, error)
 
