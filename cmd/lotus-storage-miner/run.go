@@ -172,7 +172,7 @@ var runCmd = &cli.Command{
 					return
 				case <-time.After(build.BlockDelay * time.Second):
 				}
-				pledgeMode := storage.PledgeSectorMode(minerapi.GetPledgeSectorMode())
+				pledgeMode := storage.PledgeSectorMode(minerapi.GetPledgeSectorMode(ctx))
 				log.Infof("pledge sector mode: %d", pledgeMode)
 				if pledgeMode == storage.PledgeSectorModeClose {
 					continue

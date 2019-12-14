@@ -32,16 +32,7 @@ type StorageMinerAPI struct {
 	BlockMiner *miner.Miner
 	Full       api.FullNode
 
-	// 0 for close, 1 for remote/local, 2 for remote, 3 for local
 	PledgeSectorMode storage.PledgeSectorMode
-}
-
-func (sm *StorageMinerAPI) SetPledgeSectorMode(pledgeMode string) {
-	sm.PledgeSectorMode = storage.PledgeSectorMode(pledgeMode)
-}
-
-func (sm *StorageMinerAPI) GetPledgeSectorMode() string {
-	return string(sm.PledgeSectorMode)
 }
 
 func (sm *StorageMinerAPI) ServeRemote(w http.ResponseWriter, r *http.Request) {
@@ -157,6 +148,14 @@ func (sm *StorageMinerAPI) ActorSectorSize(ctx context.Context, addr address.Add
 
 func (sm *StorageMinerAPI) PledgeSector(ctx context.Context) error {
 	return sm.Miner.PledgeSector(ctx)
+}
+
+func (sm *StorageMinerAPI) SetPledgeSectorMode(ctx context.Context, pledgeMode string) {
+	sm.PledgeSectorMode = storage.PledgeSectorMode(pledgeMode)
+}
+
+func (sm *StorageMinerAPI) GetPledgeSectorMode(ctx context.Context) string {
+	return string(sm.PledgeSectorMode)
 }
 
 func (sm *StorageMinerAPI) SectorsStatus(ctx context.Context, sid uint64) (api.SectorInfo, error) {

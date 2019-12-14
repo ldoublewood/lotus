@@ -34,18 +34,17 @@ var pledgeSectorCmd = &cli.Command{
 			return err
 		}
 		defer closer()
+		ctx := lcli.ReqContext(cctx)
 		if cctx.Bool("get") {
-			fmt.Println("pledge sector mode: %s", nodeApi.GetPledgeSectorMode())
+			fmt.Printf("pledge sector mode: %s\n", nodeApi.GetPledgeSectorMode(ctx))
 			return nil
 		}
 
 		setPledge := cctx.String("set")
 		if setPledge != "" {
-			nodeApi.SetPledgeSectorMode(setPledge)
+			nodeApi.SetPledgeSectorMode(ctx, setPledge)
 			return nil
 		}
-
-		ctx := lcli.ReqContext(cctx)
 
 		return nodeApi.PledgeSector(ctx)
 	},
