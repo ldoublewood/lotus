@@ -3,20 +3,17 @@ package storage
 import (
 	"bytes"
 	"context"
-	"io"
-	"math"
-	"math/rand"
-	"sync"
-
+	"encoding/hex"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/sectorbuilder"
 	"golang.org/x/xerrors"
+	"math"
 )
 
-var commP []byte
-var lock sync.Mutex
+//var commP []byte
+//var lock sync.Mutex
 
 func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPieceSizes []uint64, sizes ...uint64) ([]Piece, error) {
 	if len(sizes) == 0 {
@@ -28,23 +25,23 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 		log.Infof("RateLimit begin %d", sectorID)
 		release := m.sb.RateLimit()
 		log.Infof("RateLimit end %d", sectorID)
-		lock.Lock()
-		if commP == nil {
-			ccommP, err := sectorbuilder.GeneratePieceCommitment(io.LimitReader(rand.New(rand.NewSource(42)), int64(size)), size)
-			if err != nil {
-				panic(err)
-			}
-			commP = make([]byte, sectorbuilder.CommLen)
-			copy(commP, ccommP[:])
-		}
-		lock.Unlock()
-		log.Infof("GeneratePieceCommitment %d, %q", sectorID, commP)
-		//commP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
+		//lock.Lock()
+		//if commP == nil {
+		//	ccommP, err := sectorbuilder.GeneratePieceCommitment(io.LimitReader(rand.New(rand.NewSource(42)), int64(size)), size)
+		//	if err != nil {
+		//		panic(err)
+		//	}
+		//	commP = make([]byte, sectorbuilder.CommLen)
+		//	copy(commP, ccommP[:])
+		//}
+		//lock.Unlock()
+		//log.Infof("GeneratePieceCommitment %d, %q", sectorID, commP)
+		commP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
 
 		release()
-		//if err != nil {
-		//	panic(err)
-		//}
+		if err != nil {
+			panic(err)
+		}
 
 		sdp := actors.StorageDealProposal{
 			PieceRef:             commP[:],
@@ -105,32 +102,32 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 	out := make([]Piece, len(sizes))
 
 	for i, size := range sizes {
-		log.Infof("AddPiece begin %d", sectorID)
-		ppi, err := m.sb.AddPiece(size, sectorID, io.LimitReader(rand.New(rand.NewSource(42)), int64(size)), existingPieceSizes)
-		if err != nil {
-			return nil, err
-		}
-		log.Infof("AddPiece end %d", sectorID)
+		//log.Infof("AddPiece begin %d", sectorID)
+		//ppi, err := m.sb.AddPiece(size, sectorID, io.LimitReader(rand.New(rand.NewSource(42)), int64(size)), existingPieceSizes)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//log.Infof("AddPiece end %d", sectorID)
 
 		existingPieceSizes = append(existingPieceSizes, size)
 
-		out[i] = Piece{
-			DealID: resp.DealIDs[i],
-			Size:   ppi.Size,
-			CommP:  ppi.CommP[:],
-		}
-
-
-		//commP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
-		//
-		//if err != nil {
-		//	panic(err)
-		//}
 		//out[i] = Piece{
 		//	DealID: resp.DealIDs[i],
-		//	Size:   34091302912,
-		//	CommP:  commP,
+		//	Size:   ppi.Size,
+		//	CommP:  ppi.CommP[:],
 		//}
+
+
+		commP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
+
+		if err != nil {
+			panic(err)
+		}
+		out[i] = Piece{
+			DealID: resp.DealIDs[i],
+			Size:   34091302912,
+			CommP:  commP,
+		}
 	}
 
 	return out, nil
