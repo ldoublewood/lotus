@@ -21,6 +21,21 @@ import (
 var clientCmd = &cli.Command{
 	Name:  "client",
 	Usage: "Make deals, store data, retrieve data",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "fullnode-api",
+			EnvVars: []string{"FULLNODE_API"},
+			Usage: "Address of full node RPC, e.g. /ip4/127.0.0.1/tcp/1234/http",
+			Value: "",
+		},
+		&cli.StringFlag{
+			Name:  "fullnode-token",
+			EnvVars: []string{"FULLNODE_TOKEN"},
+			Usage: "Token to access full node RPC",
+			Value: "",
+		},
+	},
+
 	Subcommands: []*cli.Command{
 		clientImportCmd,
 		clientLocalCmd,
