@@ -50,7 +50,7 @@ func main() {
 	app := &cli.App{
 		Name:    "lotus-helper",
 		Usage:   "Devnet helper",
-		Version: build.Version,
+		Version: build.BuildVersion,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "repo",
@@ -390,7 +390,7 @@ func (h *handler) createMiner(fnapi api.FullNode, repoPath string) (err error) {
 		return err
 	}
 
-	if v.APIVersion&build.MinorMask != build.APIVersion&build.MinorMask {
+	if !v.APIVersion.EqMajorMinor(build.APIVersion) {
 		return xerrors.Errorf("Remote API version didn't match (local %x, remote %x)", build.APIVersion, v.APIVersion)
 	}
 
