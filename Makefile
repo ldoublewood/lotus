@@ -25,7 +25,7 @@ FFI_DEPS:=$(addprefix $(FFI_PATH),$(FFI_DEPS))
 $(FFI_DEPS): build/.filecoin-install ;
 
 build/.filecoin-install: $(FFI_PATH)
-	$(MAKE) -C $(FFI_PATH) $(FFI_DEPS:$(FFI_PATH)%=%)
+	FFI_BUILD_FROM_SOURCE=1 $(MAKE) -C $(FFI_PATH) $(FFI_DEPS:$(FFI_PATH)%=%)
 	@touch $@
 
 MODULES+=$(FFI_PATH)
@@ -73,16 +73,25 @@ lotus-seal-worker: $(BUILD_DEPS)
 .PHONY: lotus-seal-worker
 BINS+=lotus-seal-worker
 
+
 lotus-shed: $(BUILD_DEPS)
 	rm -f lotus-shed
 	go build $(GOFLAGS) -o lotus-shed ./cmd/lotus-shed
-	go run github.com/GeertJohan/go.rice/rice append --exec lotus-shed -i ./build
-.PHONY: lotus-seal-worker
-BINS+=lotus-seal-worker
 
-build: lotus lotus-storage-miner lotus-seal-worker
+.PHONY: lotus-shed
+BINS+=lotus-shed
+
+lotus-helper: $(BUILD_DEPS)
+	rm -f lotus-helper
+	go build $(GOFLAGS) -o lotus-helper ./cmd/lotus-helper
+	go run github.com/GeertJohan/go.rice/rice append --exec lotus-helper -i ./build
+.PHONY: lotus-helper
+BINS+=lotus-helper
+
+build: lotus lotus-storage-miner  lotus-seal-worker lotus-helper
 	@[[ $$(type -P "lotus") ]] && echo "Caution: you have \
 an existing lotus binary in your PATH. This may cause problems if you don't run 'sudo make install'" || true
+
 
 .PHONY: build
 
