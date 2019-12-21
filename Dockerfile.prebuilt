@@ -1,0 +1,22 @@
+FROM golang:1.13.4
+
+ENV VERSION 1.0
+
+WORKDIR /workdir
+
+# for those in China
+#RUN mv /etc/apt/sources.list /etc/apt/sources.list.bak && \
+#    echo "deb http://mirrors.163.com/debian/ buster main non-free contrib" >/etc/apt/sources.list && \
+#    echo "deb http://mirrors.163.com/debian/ buster-proposed-updates main non-free contrib" >>/etc/apt/sources.list && \
+#    echo "deb-src http://mirrors.163.com/debian/ buster main non-free contrib" >>/etc/apt/sources.list && \
+#    echo "deb-src http://mirrors.163.com/debian/ buster-proposed-updates main non-free contrib" >>/etc/apt/sources.list
+
+RUN apt update -y && apt install -y llvm clang libclang-dev mesa-opencl-icd ocl-icd-opencl-dev
+
+COPY ./lotus /workdir/
+
+COPY ./lotus-storage-miner /workdir/
+
+COPY ./lotus-helper /workdir/
+
+CMD ["/workdir/lotus","daemon"]
