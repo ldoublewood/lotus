@@ -41,6 +41,11 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 		//}
 		//lock.Unlock()
 		//log.Infof("GeneratePieceCommitment %d, %q", sectorID, commP)
+
+		// 32G random seed 42
+		// commp: fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e Size: 34091302912
+		// 1G random seed 42
+		// commp: fcbeeaccf316d229fea7b14af2c44f86f324dd4b5f87910d89396b86aa4f0d0f Size: 1065353216
 		commP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
 
 		release()

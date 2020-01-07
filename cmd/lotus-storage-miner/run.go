@@ -166,12 +166,6 @@ var runCmd = &cli.Command{
 			log.Infof("Begin pledge sector")
 			ctx := lcli.ReqContext(cctx)
 			for {
-				select {
-				case <-ctx.Done():
-					log.Infof("End pledge sector")
-					return
-				case <-time.After(build.BlockDelay * time.Second):
-				}
 				pledgeMode := storage.PledgeSectorMode(minerapi.GetPledgeSectorMode(ctx))
 				log.Infof("pledge sector mode: %s", pledgeMode)
 				if pledgeMode == storage.PledgeSectorModeClose {
@@ -203,7 +197,7 @@ var runCmd = &cli.Command{
 				log.Infof("Pledge: threshold %d", threshold)
 				wg := sync.WaitGroup{}
 				wg.Add(threshold)
-				for ; threshold > 0; threshold-- {
+				for i := 0; i < threshold; i++ {
 					go func() {
 						err := minerapi.PledgeSector(ctx)
 						if err != nil {
@@ -215,6 +209,15 @@ var runCmd = &cli.Command{
 					}()
 				}
 				wg.Wait()
+				if threshold > 0 {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					log.Infof("End pledge sector")
+					return
+				case <-time.After(build.BlockDelay * time.Second):
+				}
 			}
 		}()
 
