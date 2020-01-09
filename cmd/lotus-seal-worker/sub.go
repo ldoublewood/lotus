@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"path/filepath"
 	"net/http"
-	"os"
 
 	paramfetch "github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-sectorbuilder"
