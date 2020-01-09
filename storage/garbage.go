@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"io"
 	"math"
-	"math/rand"
-	"sync"
 
 	sectorbuilder "github.com/filecoin-project/go-sectorbuilder"
 	"golang.org/x/xerrors"
@@ -24,6 +21,13 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 	if len(sizes) == 0 {
 		return nil, nil
 	}
+	// 32G random seed 42
+	// commp: fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e Size: 34091302912
+	// 1G random seed 42
+	// commp: fcbeeaccf316d229fea7b14af2c44f86f324dd4b5f87910d89396b86aa4f0d0f Size: 1065353216
+	definedCommP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
+	var definedSize uint64
+	definedSize = 34091302912
 
 	deals := make([]actors.StorageDealProposal, len(sizes))
 	for i, size := range sizes {
@@ -42,19 +46,13 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 		//lock.Unlock()
 		//log.Infof("GeneratePieceCommitment %d, %q", sectorID, commP)
 
-		// 32G random seed 42
-		// commp: fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e Size: 34091302912
-		// 1G random seed 42
-		// commp: fcbeeaccf316d229fea7b14af2c44f86f324dd4b5f87910d89396b86aa4f0d0f Size: 1065353216
-		commP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
-
 		release()
 		if err != nil {
 			panic(err)
 		}
 
 		sdp := actors.StorageDealProposal{
-			PieceRef:             commP[:],
+			PieceRef:             definedCommP[:],
 			PieceSize:            size,
 			Client:               m.worker,
 			Provider:             m.maddr,
@@ -127,16 +125,13 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 		//	CommP:  ppi.CommP[:],
 		//}
 
-
-		commP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
-
 		if err != nil {
 			panic(err)
 		}
 		out[i] = Piece{
 			DealID: resp.DealIDs[i],
-			Size:   34091302912,
-			CommP:  commP,
+			Size:   definedSize,
+			CommP:  definedCommP,
 		}
 	}
 
