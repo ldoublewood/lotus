@@ -75,6 +75,8 @@ type SectorInfo struct {
 	// Debug
 	LastErr string
 
+	WorkerDir string
+
 	// TODO: Log []struct{ts, msg, trace string}
 }
 
