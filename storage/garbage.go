@@ -25,9 +25,20 @@ func (m *Miner) pledgeSector(ctx context.Context, sectorID uint64, existingPiece
 	// commp: fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e Size: 34091302912
 	// 1G random seed 42
 	// commp: fcbeeaccf316d229fea7b14af2c44f86f324dd4b5f87910d89396b86aa4f0d0f Size: 1065353216
-	definedCommP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
+	//definedCommP, err := hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
+	var definedCommP []byte
+	var err error
 	var definedSize uint64
-	definedSize = 34091302912
+	if m.sb.SectorSize() == 1073741824 {
+		definedCommP, err = hex.DecodeString("fcbeeaccf316d229fea7b14af2c44f86f324dd4b5f87910d89396b86aa4f0d0f")
+		definedSize = 1065353216
+	} else if m.sb.SectorSize() == 34359738368 {
+		definedCommP, err = hex.DecodeString("fd2fc3c8f13169111766c62c629262752b2be468f531cfc88c0b47d1ac13c62e")
+		definedSize = 34091302912
+	} else {
+		panic ("unsupport sector size")
+	}
+	//definedSize = 34091302912
 
 	deals := make([]actors.StorageDealProposal, len(sizes))
 	for i, size := range sizes {
