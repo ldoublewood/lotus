@@ -3,12 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
-	"io"
+	"encoding/hex"
 	"math"
-	"math/rand"
 	sectorbuilder "github.com/filecoin-project/go-sectorbuilder"
 	"golang.org/x/xerrors"
-	"sync"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
