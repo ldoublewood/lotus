@@ -185,10 +185,6 @@ var runCmd = &cli.Command{
 				}
 				log.Infof("Pledge: Local %d / %d (+%d reserved)", wstat.LocalTotal-wstat.LocalReserved-wstat.LocalFree, wstat.LocalTotal-wstat.LocalReserved, wstat.LocalReserved)
 				log.Infof("Pledge: Remote %d / %d", wstat.RemotesTotal-wstat.RemotesFree, wstat.RemotesTotal)
-				if wstat.AddPieceWait + wstat.UnsealWait + wstat.PreCommitWait + wstat.CommitWait > wstat.LocalTotal + wstat.RemotesTotal {
-					log.Infof("Pledge: too many queueing")
-					continue
-				}
 				threshold := 0
 				if pledgeMode == storage.PledgeSectorModeAll {
 					threshold = wstat.LocalFree + wstat.RemotesFree
@@ -197,8 +193,8 @@ var runCmd = &cli.Command{
 				} else if pledgeMode == storage.PledgeSectorModeLocal {
 					threshold = wstat.LocalFree
 				} else {
-					log.Infof("Unknown pledge sector mode: %s", pledgeMode)
-					continue
+					log.Errorf("Unknown pledge sector mode: %s", pledgeMode)
+					return
 				}
 				log.Infof("Pledge: threshold %d", threshold)
 				wg := sync.WaitGroup{}
