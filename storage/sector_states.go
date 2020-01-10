@@ -188,6 +188,9 @@ func (m *Miner) handleCommitting(ctx context.Context, sector SectorInfo) *sector
 		proof = sector.Proof
 		workerDir = sector.WorkerDir
 	}
+	if workerDir == "" {
+		panic("empty worker directory")
+	}
 
 	// TODO: Consider splitting states and persist proof for faster recovery
 
