@@ -131,11 +131,6 @@ func (s *fpostScheduler) runPost(ctx context.Context, eps uint64, ts *types.TipS
 
 	tsStart := time.Now()
 
-	err = s.miner.filWorkerDirForSectors(ssi)
-	if err != nil {
-		return nil, err
-	}
-
 	var seed [32]byte
 	copy(seed[:], rand)
 
