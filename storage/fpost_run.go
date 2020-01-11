@@ -119,17 +119,17 @@ func (s *fpostScheduler) runPost(ctx context.Context, eps uint64, ts *types.TipS
 
 	log.Infow("running fPoSt", "chain-random", rand, "eps", eps, "height", ts.Height())
 
+	err = s.miner.filWorkerDirForSectors(ssi)
+	if err != nil {
+		return nil, err
+	}
+
 	faults, err := s.checkFaults(ctx, ssi)
 	if err != nil {
 		log.Errorf("Failed to declare faults: %+v", err)
 	}
 
 	tsStart := time.Now()
-
-	err = s.miner.filWorkerDirForSectors(ssi)
-	if err != nil {
-		return nil, err
-	}
 
 	var seed [32]byte
 	copy(seed[:], rand)

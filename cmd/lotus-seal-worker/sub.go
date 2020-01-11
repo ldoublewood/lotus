@@ -64,7 +64,7 @@ func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, aut
 	tasks, err := api.WorkerQueue(ctx, sectorbuilder.WorkerCfg{
 		NoPreCommit: noprecommit,
 		NoCommit:    nocommit,
-		Directory: 	 repo,
+		Directory:   repo,
 		IPAddress:   myIP.String(),
 	})
 	if err != nil {
@@ -103,9 +103,9 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 		return errRes(xerrors.Errorf("unknown task type %d", task.Type))
 	}
 
-	if err := w.fetchSector(task.SectorID, task.Type); err != nil {
+	/* if err := w.fetchSector(task.SectorID, task.Type); err != nil {
 		return errRes(xerrors.Errorf("fetching sector: %w", err))
-	}
+	} */
 
 	log.Infof("Data fetched, starting computation")
 
@@ -119,7 +119,7 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 		}
 		res.Rspco = rspco.ToJson()
 
-		if err := w.push("sealed", task.SectorID); err != nil {
+		/* if err := w.push("sealed", task.SectorID); err != nil {
 			return errRes(xerrors.Errorf("pushing precommited data: %w", err))
 		}
 
@@ -129,7 +129,7 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 
 		if err := w.remove("staging", task.SectorID); err != nil {
 			return errRes(xerrors.Errorf("cleaning up staged sector: %w", err))
-		}
+		} */
 	case sectorbuilder.WorkerCommit:
 		proof, _, err := w.sb.SealCommit(ctx, task.SectorID, task.SealTicket, task.SealSeed, task.Pieces, task.Rspco)
 		if err != nil {
@@ -138,13 +138,13 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 
 		res.Proof = proof
 
-		if err := w.push("cache", task.SectorID); err != nil {
+		/* if err := w.push("cache", task.SectorID); err != nil {
 			return errRes(xerrors.Errorf("pushing precommited data: %w", err))
 		}
 
 		if err := w.remove("sealed", task.SectorID); err != nil {
 			return errRes(xerrors.Errorf("cleaning up sealed sector: %w", err))
-		}
+		} */
 	}
 
 	return res

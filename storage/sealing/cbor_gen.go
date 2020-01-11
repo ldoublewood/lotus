@@ -425,7 +425,7 @@ func (t *SectorInfo) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{173}); err != nil {
+	if _, err := w.Write([]byte{174}); err != nil {
 		return err
 	}
 
@@ -691,6 +691,29 @@ func (t *SectorInfo) MarshalCBOR(w io.Writer) error {
 	if _, err := w.Write([]byte(t.LastErr)); err != nil {
 		return err
 	}
+
+	// t.WorkerDir (string) (string)
+	if len("WorkerDir") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"WorkerDir\" was too long")
+	}
+
+	if _, err := w.Write(cbg.CborEncodeMajorType(cbg.MajTextString, uint64(len("WorkerDir")))); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("WorkerDir")); err != nil {
+		return err
+	}
+
+	if len(t.WorkerDir) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.WorkerDir was too long")
+	}
+
+	if _, err := w.Write(cbg.CborEncodeMajorType(cbg.MajTextString, uint64(len(t.WorkerDir)))); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte(t.WorkerDir)); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -705,7 +728,7 @@ func (t *SectorInfo) UnmarshalCBOR(r io.Reader) error {
 		return fmt.Errorf("cbor input should be of type map")
 	}
 
-	if extra != 13 {
+	if extra != 14 {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
 
@@ -1087,6 +1110,29 @@ func (t *SectorInfo) UnmarshalCBOR(r io.Reader) error {
 		}
 
 		t.LastErr = string(sval)
+	}
+	// t.WorkerDir (string) (string)
+
+	{
+		sval, err := cbg.ReadString(br)
+		if err != nil {
+			return err
+		}
+
+		name = string(sval)
+	}
+
+	if name != "WorkerDir" {
+		return fmt.Errorf("expected struct map entry %s to be WorkerDir", name)
+	}
+
+	{
+		sval, err := cbg.ReadString(br)
+		if err != nil {
+			return err
+		}
+
+		t.WorkerDir = string(sval)
 	}
 	return nil
 }

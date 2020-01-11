@@ -40,6 +40,15 @@ type Miner struct {
 	stopped chan struct{}
 }
 
+type PledgeSectorMode string
+
+const (
+	PledgeSectorModeClose  PledgeSectorMode = "close"
+	PledgeSectorModeAll    PledgeSectorMode = "all"
+	PledgeSectorModeRemote PledgeSectorMode = "remote"
+	PledgeSectorModeLocal  PledgeSectorMode = "local"
+)
+
 type storageMinerApi interface {
 	// Call a read only method on actors (no interaction with the chain required)
 	StateCall(ctx context.Context, msg *types.Message, ts *types.TipSet) (*types.MessageReceipt, error)
@@ -154,9 +163,11 @@ func (epp *SectorBuilderEpp) GenerateCandidates(ctx context.Context, ssi sectorb
 	start := time.Now()
 	var faults []uint64 // TODO
 
-	err := epp.miner.filWorkerDirForSectors(ssi)
-	if err != nil {
-		return nil, err
+	if epp.miner != nil {
+		err := epp.miner.filWorkerDirForSectors(ssi)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var randbuf [32]byte
@@ -176,9 +187,11 @@ func (epp *SectorBuilderEpp) ComputeProof(ctx context.Context, ssi sectorbuilder
 	}
 	start := time.Now()
 
-	err := epp.miner.filWorkerDirForSectors(ssi)
-	if err != nil {
-		return nil, err
+	if epp.miner != nil {
+		err := epp.miner.filWorkerDirForSectors(ssi)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	proof, err := epp.sb.ComputeElectionPoSt(ssi, rand, winners)
@@ -190,12 +203,12 @@ func (epp *SectorBuilderEpp) ComputeProof(ctx context.Context, ssi sectorbuilder
 }
 
 func (m *Miner) filWorkerDirForSectors(ssi sectorbuilder.SortedPublicSectorInfo) error {
-	for _, s := range ssi.Values() {
+	for i, s := range ssi.Values() {
 		sector, err := m.GetSectorInfo(s.SectorID)
 		if err != nil {
 			return err
 		}
-		s.WorkerDir = sector.WorkerDir
+		ssi.Values()[i].WorkerDir = sector.WorkerDir
 	}
 	return nil
 }
