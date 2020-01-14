@@ -193,7 +193,7 @@ func doCreateMinerByWeb(address string, proxy string) (actor string, err error) 
 	}
 
 	url := "https://faucet.testnet.filecoin.io/mkminer"
-	data := "address=" + address + "&sectorSize=1073741824"
+	data := "address=" + address + "&sectorSize=34359738368"
 
 
 	var request *http.Request
