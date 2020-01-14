@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
+	"strings"
 
 	paramfetch "github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-sectorbuilder"
@@ -21,7 +24,7 @@ type worker struct {
 	sb *sectorbuilder.SectorBuilder
 }
 
-func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, auth http.Header, repo string, noprecommit, nocommit bool) error {
+func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, auth http.Header, mysshaddr string, repo string, noprecommit, nocommit bool) error {
 	act, err := api.ActorAddress(ctx)
 	if err != nil {
 		return err
@@ -56,6 +59,8 @@ func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, aut
 	tasks, err := api.WorkerQueue(ctx, sectorbuilder.WorkerCfg{
 		NoPreCommit: noprecommit,
 		NoCommit:    nocommit,
+//		Directory: 	 repo,
+//		IPAddress:   mysshaddr,
 	})
 	if err != nil {
 		return err
@@ -93,9 +98,9 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 		return errRes(xerrors.Errorf("unknown task type %d", task.Type))
 	}
 
-	if err := w.fetchSector(task.SectorID, task.Type); err != nil {
+	/* if err := w.fetchSector(task.SectorID, task.Type); err != nil {
 		return errRes(xerrors.Errorf("fetching sector: %w", err))
-	}
+	} */
 
 	log.Infof("Data fetched, starting computation")
 
@@ -109,13 +114,13 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 		}
 		res.Rspco = rspco.ToJson()
 
-		if err := w.push("sealed", task.SectorID); err != nil {
+		/* if err := w.push("sealed", task.SectorID); err != nil {
 			return errRes(xerrors.Errorf("pushing precommited data: %w", err))
 		}
 
 		if err := w.push("cache", task.SectorID); err != nil {
 			return errRes(xerrors.Errorf("pushing precommited data: %w", err))
-		}
+		} */
 	case sectorbuilder.WorkerCommit:
 		proof, err := w.sb.SealCommit(task.SectorID, task.SealTicket, task.SealSeed, task.Pieces, task.Rspco)
 		if err != nil {
@@ -124,9 +129,9 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 
 		res.Proof = proof
 
-		if err := w.push("cache", task.SectorID); err != nil {
+		/* if err := w.push("cache", task.SectorID); err != nil {
 			return errRes(xerrors.Errorf("pushing precommited data: %w", err))
-		}
+		} */
 	}
 
 	return res
@@ -134,4 +139,19 @@ func (w *worker) processTask(ctx context.Context, task sectorbuilder.WorkerTask)
 
 func errRes(err error) sectorbuilder.SealRes {
 	return sectorbuilder.SealRes{Err: err.Error(), GoErr: err}
+}
+
+func getMyIP() (net.IP, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil && strings.HasPrefix(ipnet.IP.String(), "192.168.") {
+				return ipnet.IP, nil
+			}
+		}
+	}
+	return nil, errors.New("my ip not found")
 }
