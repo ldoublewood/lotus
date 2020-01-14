@@ -1,8 +1,8 @@
 [submodule "extern/filecoin-ffi"]
 	path = extern/filecoin-ffi
 	url = ../filecoin-ffi.git
-	branch = filcloud
+	branch = master
 [submodule "extern/go-sectorbuilder"]
 	path = extern/go-sectorbuilder
 	url = ../go-sectorbuilder.git
-	branch = filcloud
+	branch = ldb/filcloud
