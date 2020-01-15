@@ -185,6 +185,17 @@ var runCmd = &cli.Command{
 				}
 				log.Infof("Pledge: Local %d / %d (+%d reserved)", wstat.LocalTotal-wstat.LocalReserved-wstat.LocalFree, wstat.LocalTotal-wstat.LocalReserved, wstat.LocalReserved)
 				log.Infof("Pledge: Remote %d / %d", wstat.RemotesTotal-wstat.RemotesFree, wstat.RemotesTotal)
+				if wstat.AddPieceWait+wstat.PreCommitWait+wstat.CommitWait+wstat.UnsealWait > wstat.LocalFree+wstat.RemotesFree {
+					log.Infow("Pledge: break for too much wait", "AddPieceWait", wstat.AddPieceWait, "PreCommitWait", wstat.PreCommitWait,
+						"CommitWait", wstat.CommitWait, "UnsealWait", wstat.UnsealWait)
+					select {
+					case <-ctx.Done():
+						log.Infof("End pledge sector")
+						return
+					case <-time.After(build.BlockDelay * time.Second):
+					}
+					continue
+				}
 				threshold := 0
 				if pledgeMode == storage.PledgeSectorModeAll {
 					threshold = wstat.LocalFree + wstat.RemotesFree
