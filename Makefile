@@ -80,7 +80,7 @@ lotus-shed: $(BUILD_DEPS)
 .PHONY: lotus-seal-worker
 BINS+=lotus-seal-worker
 
-build: lotus lotus-storage-miner lotus-seal-worker
+build: lotus lotus-storage-miner lotus-seal-worker lotus-seed
 	@[[ $$(type -P "lotus") ]] && echo "Caution: you have \
 an existing lotus binary in your PATH. This may cause problems if you don't run 'sudo make install'" || true
 
@@ -90,6 +90,7 @@ install:
 	install -C ./lotus /usr/local/bin/lotus
 	install -C ./lotus-storage-miner /usr/local/bin/lotus-storage-miner
 	install -C ./lotus-seal-worker /usr/local/bin/lotus-seal-worker
+	install -C ./lotus-seed /usr/local/bin/lotus-seed
 
 # TOOLS
 
@@ -137,8 +138,8 @@ BINS+=chainwatch
 
 bench:
 	rm -f bench
-	go build -o bench ./cmd/lotus-bench
-	go run github.com/GeertJohan/go.rice/rice append --exec bench -i ./build
+	go build -o lotus-bench ./cmd/lotus-bench
+	go run github.com/GeertJohan/go.rice/rice append --exec lotus-bench -i ./build
 .PHONY: bench
 BINS+=bench
 

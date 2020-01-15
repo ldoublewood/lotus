@@ -207,6 +207,15 @@ func (s *fpostScheduler) submitPost(ctx context.Context, proof *actors.SubmitFal
 		return xerrors.Errorf("pushing message to mpool: %w", err)
 	}
 
+	rec, err := s.api.StateWaitMsg(ctx, sm.Cid())
+	if err != nil {
+		return xerrors.Errorf("waiting for submitting fallback post: %w", err)
+	}
+
+	if rec.Receipt.ExitCode != 0 {
+		return xerrors.Errorf("Submitting fallback post exit %d", rec.Receipt.ExitCode)
+	}
+
 	log.Infof("Submitted fallback post: %s", sm.Cid())
 
 	return nil
