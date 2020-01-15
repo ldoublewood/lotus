@@ -167,7 +167,7 @@ var runCmd = &cli.Command{
 			ctx := lcli.ReqContext(cctx)
 			for {
 				pledgeMode := storage.PledgeSectorMode(minerapi.GetPledgeSectorMode(ctx))
-				log.Infof("pledge sector mode: %s", pledgeMode)
+				// log.Infof("pledge sector mode: %s", pledgeMode)
 				if pledgeMode == storage.PledgeSectorModeClose {
 					select {
 					case <-ctx.Done():

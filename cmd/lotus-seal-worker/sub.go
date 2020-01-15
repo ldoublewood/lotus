@@ -77,6 +77,7 @@ loop:
 
 		select {
 		case task := <-tasks:
+
 			log.Infof("New task: %d, sector %d, action: %d", task.TaskID, task.SectorID, task.Type)
 
 			res := w.processTask(ctx, task)
@@ -85,6 +86,7 @@ loop:
 
 			if err := api.WorkerDone(ctx, task.TaskID, res); err != nil {
 				log.Error(err)
+				return err
 			}
 		case <-ctx.Done():
 			break loop
