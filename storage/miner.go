@@ -237,14 +237,19 @@ func (m *Miner) WorkerResume(ctx context.Context, task sectorbuilder.WorkerTask,
 		log.Infof("Resume sector %d from %s", sector.SectorID, api.SectorStates[api.PreCommitFailed])
 		m.handleSectorUpdate(ctx, sector, func (ctx context.Context, sector SectorInfo) *sectorUpdate {
 			return sector.upd().to(api.PreCommitting).state(func(info *SectorInfo) {
-				info.CommD = task.Rspco.CommD[:]
-				info.CommR = task.Rspco.CommR[:]
+				info.CommD = res.Rspco.CommD // when precommit
+				info.CommR = res.Rspco.CommR
+				if len(res.Rspco.CommR) == 0 {
+					info.CommD = task.Rspco.CommD[:] // when commit
+					info.CommR = task.Rspco.CommR[:]
+				}
 				info.Ticket = SealTicket{
 					BlockHeight: task.SealTicket.BlockHeight,
 					TicketBytes: task.SealTicket.TicketBytes[:],
 				}
 			})
 		})
+		// TODO: resume worker to do commit task
 		return false, err
 
 	case api.SealCommitFailed:
