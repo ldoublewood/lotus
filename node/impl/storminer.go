@@ -231,4 +231,8 @@ func (sm *StorageMinerAPI) WorkerDone(ctx context.Context, task uint64, res sect
 	return sm.SectorBuilder.TaskDone(ctx, task, res)
 }
 
+func (sm *StorageMinerAPI) WorkerResume(ctx context.Context, task sectorbuilder.WorkerTask, res sectorbuilder.SealRes, cfg sectorbuilder.WorkerCfg) (bool, error) {
+	return sm.Miner.WorkerResume(ctx, task, res, cfg)
+}
+
 var _ api.StorageMiner = &StorageMinerAPI{}

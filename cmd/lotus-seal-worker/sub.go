@@ -24,7 +24,7 @@ type worker struct {
 	sb *sectorbuilder.SectorBuilder
 }
 
-func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, auth http.Header, repo string, noprecommit, nocommit bool) error {
+func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, auth http.Header, repo string, noprecommit, nocommit bool, taskStore *TaskStore) error {
 	act, err := api.ActorAddress(ctx)
 	if err != nil {
 		return err
@@ -61,12 +61,33 @@ func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, aut
 		return err
 	}
 
-	tasks, err := api.WorkerQueue(ctx, sectorbuilder.WorkerCfg{
+	cfg := sectorbuilder.WorkerCfg{
 		NoPreCommit: noprecommit,
 		NoCommit:    nocommit,
 		Directory:   repo,
 		IPAddress:   myIP.String(),
-	})
+	}
+
+	storedTasks, err := taskStore.ListTasks()
+	if err != nil {
+		return err
+	}
+	for _, task := range storedTasks {
+		finished, err := api.WorkerResume(ctx, task.WorkerTask, task.SealRes, cfg)
+		if err != nil {
+			return err
+		} else if !finished {
+			log.Infof("Resumed done task: sector %d, action %d", task.WorkerTask.SectorID, task.WorkerTask.Type)
+		} else {
+			log.Infof("Finished done task: sector %d", task.WorkerTask.SectorID)
+			err = taskStore.Delete(task.WorkerTask.SectorID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	tasks, err := api.WorkerQueue(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -83,6 +104,14 @@ loop:
 			res := w.processTask(ctx, task)
 
 			log.Infof("Task %d done, err: %+v", task.TaskID, res.GoErr)
+
+			err = taskStore.PutTask(Task{
+				WorkerTask: task,
+				SealRes:    res,
+			})
+			if err != nil {
+				log.Errorf("Store task: %+v", err)
+			}
 
 			if err := api.WorkerDone(ctx, task.TaskID, res); err != nil {
 				log.Error(err)

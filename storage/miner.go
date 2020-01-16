@@ -212,3 +212,64 @@ func (m *Miner) filWorkerDirForSectors(ssi sectorbuilder.SortedPublicSectorInfo)
 	}
 	return nil
 }
+
+func (m *Miner) WorkerResume(ctx context.Context, task sectorbuilder.WorkerTask, res sectorbuilder.SealRes, cfg sectorbuilder.WorkerCfg) (bool, error) {
+	sector, err := m.GetSectorInfo(task.SectorID)
+	if err != nil {
+		return false, err
+	}
+	switch sector.State {
+	case api.Proving:
+		return true, err
+
+	case api.PreCommitting:
+		return false, err
+	case api.PreCommitted:
+		return false, err
+	case api.Committing:
+		return false, err
+	case api.CommitWait:
+		return false, err
+
+	case api.SealFailed:
+		fallthrough
+	case api.PreCommitFailed:
+		log.Infof("Resume sector %d from %s", sector.SectorID, api.SectorStates[api.PreCommitFailed])
+		m.handleSectorUpdate(ctx, sector, func (ctx context.Context, sector SectorInfo) *sectorUpdate {
+			return sector.upd().to(api.PreCommitting).state(func(info *SectorInfo) {
+				info.CommD = task.Rspco.CommD[:]
+				info.CommR = task.Rspco.CommR[:]
+				info.Ticket = SealTicket{
+					BlockHeight: task.SealTicket.BlockHeight,
+					TicketBytes: task.SealTicket.TicketBytes[:],
+				}
+			})
+		})
+		return false, err
+
+	case api.SealCommitFailed:
+		if task.Type == sectorbuilder.WorkerCommit {
+			log.Infof("Resume sector %d from %s", sector.SectorID, api.SectorStates[api.SealCommitFailed])
+			workerDir, err := m.sb.GetPath("workers", cfg.IPAddress)
+			if err != nil {
+				return false, err
+			}
+			sector.Proof = res.Proof
+			sector.WorkerDir = workerDir
+			m.handleSectorUpdate(ctx, sector, m.handleCommitting)
+		} else {
+			// TODO: resume commit task
+		}
+		return false, err
+
+	case api.CommitFailed:
+		log.Infof("Resume sector %d from %s", sector.SectorID, api.SectorStates[api.CommitFailed])
+		m.handleSectorUpdate(ctx, sector, m.handleCommitting)
+		return false, err
+
+	case api.FailedUnrecoverable:
+		// TODO: resume?
+	}
+
+	return true, err // don't know how to handle, so treat it as finished
+}
