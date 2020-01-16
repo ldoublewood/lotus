@@ -95,6 +95,11 @@ func main() {
 				Name:  "skip-unseal",
 				Usage: "skip the unseal portion of the benchmark",
 			},
+			&cli.BoolFlag{
+				Name:  "only-staging",
+				Usage: "only provide staging file",
+			},
+
 		},
 		Action: func(c *cli.Context) error {
 			if c.Bool("no-gpu") {
@@ -117,11 +122,14 @@ func main() {
 				if err != nil {
 					return err
 				}
-				defer func() {
-					if err := os.RemoveAll(tsdir); err != nil {
-						log.Warn("remove all: ", err)
-					}
-				}()
+				//in case of only-staging, don't remove staging file
+				if !c.Bool("only-staging") {
+					defer func() {
+						if err := os.RemoveAll(tsdir); err != nil {
+							log.Warn("remove all: ", err)
+						}
+					}()
+				}
 				sbdir = tsdir
 			} else {
 				exp, err := homedir.Expand(robench)
@@ -181,6 +189,10 @@ func main() {
 				}
 
 				fmt.Println("commp:", hex.EncodeToString(pi.CommP[:]), " Size:", pi.Size)
+
+				if c.Bool("only-staging") {
+					return nil
+				}
 
 				addpiece := time.Now()
 
