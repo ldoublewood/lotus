@@ -24,7 +24,7 @@ type worker struct {
 	sb *sectorbuilder.SectorBuilder
 }
 
-func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, auth http.Header, repo string, noprecommit, nocommit bool, taskStore *TaskStore) error {
+func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, auth http.Header, repo string, noprecommit, nocommit bool) error {
 	act, err := api.ActorAddress(ctx)
 	if err != nil {
 		return err
@@ -67,6 +67,12 @@ func acceptJobs(ctx context.Context, api lapi.StorageMiner, endpoint string, aut
 		Directory:   repo,
 		IPAddress:   myIP.String(),
 	}
+
+	taskStore, err := NewTaskStore(repo)
+	if err != nil {
+		return err
+	}
+	defer taskStore.Close()
 
 	storedTasks, err := taskStore.ListTasks()
 	if err != nil {

@@ -130,3 +130,82 @@ func (m *Sealing) newSector(ctx context.Context, sid uint64, dealID uint64, ppi 
 		},
 	})
 }
+
+func (m *Sealing) WorkerResume(ctx context.Context, task sectorbuilder.WorkerTask, res sectorbuilder.SealRes, cfg sectorbuilder.WorkerCfg) (bool, error) {
+	sector, err := m.GetSectorInfo(task.SectorID)
+	if err != nil {
+		return false, err
+	}
+	switch sector.State {
+	case api.Proving:
+		return true, nil
+
+	case api.PreCommitting:
+		return false, nil
+	case api.PreCommitted:
+		return false, nil
+	case api.Committing:
+		return false, nil
+	case api.CommitWait:
+		return false, nil
+
+	case api.SealFailed:
+		fallthrough
+	case api.PreCommitFailed:
+		log.Infof("Resume sector %d from %s", sector.SectorID, api.SectorStates[api.PreCommitFailed])
+		commD := res.Rspco.CommD // when precommit
+		commR := res.Rspco.CommR
+		if len(res.Rspco.CommR) == 0 {
+			commD = task.Rspco.CommD[:] // when commit
+			commR = task.Rspco.CommR[:]
+		}
+		err = m.sectors.Send(sector.SectorID, SectorSealed{
+			commD: commD,
+			commR: commR,
+			ticket: SealTicket{
+				BlockHeight: task.SealTicket.BlockHeight,
+				TicketBytes: task.SealTicket.TicketBytes[:],
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+		// TODO: resume worker to do commit task
+		return false, nil
+
+	case api.SealCommitFailed:
+		if task.Type == sectorbuilder.WorkerCommit {
+			log.Infof("Resume sector %d from %s", sector.SectorID, api.SectorStates[api.SealCommitFailed])
+			workerDir, err := m.sb.GetPath("workers", cfg.IPAddress)
+			if err != nil {
+				return false, err
+			}
+			sector.Proof = res.Proof
+			sector.WorkerDir = workerDir
+			err = m.handleCommitting(statemachine.NewContext(ctx, func(evt interface{}) error {
+				return m.sectors.Send(sector.SectorID, evt)
+			}), sector)
+			if err != nil {
+				return false, err
+			}
+		} else {
+			// TODO: resume commit task
+		}
+		return false, nil
+
+	case api.CommitFailed:
+		log.Infof("Resume sector %d from %s", sector.SectorID, api.SectorStates[api.CommitFailed])
+		err = m.handleCommitting(statemachine.NewContext(ctx, func(evt interface{}) error {
+			return m.sectors.Send(sector.SectorID, evt)
+		}), sector)
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+
+	case api.FailedUnrecoverable:
+		// TODO: resume?
+	}
+
+	return true, nil // don't know how to handle, so treat it as finished
+}

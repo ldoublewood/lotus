@@ -145,7 +145,8 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID uint64, existingPie
 	return out, nil
 }
 
-func (m *Sealing) PledgeSector(ctx context.Context) error {
+func (m *Sealing) PledgeSector() error {
+	ctx := context.TODO()
 	size := sectorbuilder.UserBytesForSectorSize(m.sb.SectorSize())
 
 	sid, err := m.sb.AcquireSectorId()

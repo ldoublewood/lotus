@@ -145,9 +145,20 @@ func (m *Sealing) handlePreCommitted(ctx statemachine.Context, sector SectorInfo
 func (m *Sealing) handleCommitting(ctx statemachine.Context, sector SectorInfo) error {
 	log.Info("scheduling seal proof computation...")
 
-	proof, err := m.sb.SealCommit(ctx.Context(), sector.SectorID, sector.Ticket.SB(), sector.Seed.SB(), sector.pieceInfos(), sector.rspco())
-	if err != nil {
-		return ctx.Send(SectorSealCommitFailed{xerrors.Errorf("computing seal proof failed: %w", err)})
+	var proof []byte
+	var workerDir string
+	if len(sector.Proof) == 0 {
+		var err error
+		proof, workerDir, err = m.sb.SealCommit(ctx.Context(), sector.SectorID, sector.Ticket.SB(), sector.Seed.SB(), sector.pieceInfos(), sector.rspco())
+		if err != nil {
+			return ctx.Send(SectorSealCommitFailed{xerrors.Errorf("computing seal proof failed: %w", err)})
+		}
+		if workerDir == "" {
+			panic("empty worker directory")
+		}
+	} else {
+		proof = sector.Proof
+		workerDir = sector.WorkerDir
 	}
 
 	// TODO: Consider splitting states and persist proof for faster recovery
@@ -183,6 +194,7 @@ func (m *Sealing) handleCommitting(ctx statemachine.Context, sector SectorInfo) 
 	return ctx.Send(SectorCommitted{
 		proof:   proof,
 		message: smsg.Cid(),
+		workerDir: workerDir,
 	})
 }
 

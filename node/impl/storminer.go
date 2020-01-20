@@ -148,7 +148,7 @@ func (sm *StorageMinerAPI) ActorSectorSize(ctx context.Context, addr address.Add
 }
 
 func (sm *StorageMinerAPI) PledgeSector(ctx context.Context) error {
-	return sm.Miner.PledgeSector(ctx)
+	return sm.Miner.PledgeSector()
 }
 
 func (sm *StorageMinerAPI) SetPledgeSectorMode(ctx context.Context, pledgeMode string) {

@@ -105,11 +105,13 @@ func (evt SectorCommitFailed) apply(*SectorInfo) {}
 type SectorCommitted struct {
 	message cid.Cid
 	proof   []byte
+	workerDir string
 }
 
 func (evt SectorCommitted) apply(state *SectorInfo) {
 	state.Proof = evt.proof
 	state.CommitMessage = &evt.message
+	state.WorkerDir = evt.workerDir
 }
 
 type SectorProving struct{}
