@@ -141,14 +141,14 @@ func errRes(err error) sectorbuilder.SealRes {
 	return sectorbuilder.SealRes{Err: err.Error(), GoErr: err}
 }
 
-func getMyIP() (net.IP, error) {
+func getMyIP(prefix string) (net.IP, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return nil, err
 	}
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil && strings.HasPrefix(ipnet.IP.String(), "192.168.") {
+			if ipnet.IP.To4() != nil && strings.HasPrefix(ipnet.IP.String(), prefix) {
 				return ipnet.IP, nil
 			}
 		}
