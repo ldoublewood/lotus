@@ -3,6 +3,6 @@
 	url = ../filecoin-ffi.git
 	branch = filcloud
 [submodule "extern/go-sectorbuilder"]
-	path = extern/go-sectorbuidler
+	path = extern/go-sectorbuilder
 	url = ../go-sectorbuilder.git
 	branch = ldb/filcloud-v01
