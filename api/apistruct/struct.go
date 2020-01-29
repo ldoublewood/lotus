@@ -148,6 +148,8 @@ type StorageMinerStruct struct {
 		ActorSectorSize func(context.Context, address.Address) (uint64, error) `perm:"read"`
 
 		PledgeSector func(context.Context) error `perm:"write"`
+		SetPledgeSectorMode func(context.Context, string) `perm:"write"`
+		GetPledgeSectorMode func(context.Context) string `perm:"write"`
 
 		SectorsStatus func(context.Context, uint64) (api.SectorInfo, error)     `perm:"read"`
 		SectorsList   func(context.Context) ([]uint64, error)                   `perm:"read"`
@@ -158,6 +160,7 @@ type StorageMinerStruct struct {
 
 		WorkerQueue func(ctx context.Context, cfg sectorbuilder.WorkerCfg) (<-chan sectorbuilder.WorkerTask, error) `perm:"admin"` // TODO: worker perm
 		WorkerDone  func(ctx context.Context, task uint64, res sectorbuilder.SealRes) error                         `perm:"admin"`
+		WorkerResume func (ctx context.Context, task sectorbuilder.WorkerTask, res sectorbuilder.SealRes, cfg sectorbuilder.WorkerCfg) (bool, error) `perm:"admin"`
 	}
 }
 
@@ -541,6 +544,14 @@ func (c *StorageMinerStruct) PledgeSector(ctx context.Context) error {
 	return c.Internal.PledgeSector(ctx)
 }
 
+func (c *StorageMinerStruct) SetPledgeSectorMode(ctx context.Context, pledgeMode string) {
+	c.Internal.SetPledgeSectorMode(ctx, pledgeMode)
+}
+
+func (c *StorageMinerStruct) GetPledgeSectorMode(ctx context.Context) string {
+	return c.Internal.GetPledgeSectorMode(ctx)
+}
+
 // Get the status of a given sector by ID
 func (c *StorageMinerStruct) SectorsStatus(ctx context.Context, sid uint64) (api.SectorInfo, error) {
 	return c.Internal.SectorsStatus(ctx, sid)
@@ -569,6 +580,10 @@ func (c *StorageMinerStruct) WorkerQueue(ctx context.Context, cfg sectorbuilder.
 
 func (c *StorageMinerStruct) WorkerDone(ctx context.Context, task uint64, res sectorbuilder.SealRes) error {
 	return c.Internal.WorkerDone(ctx, task, res)
+}
+
+func (c *StorageMinerStruct) WorkerResume(ctx context.Context, task sectorbuilder.WorkerTask, res sectorbuilder.SealRes, cfg sectorbuilder.WorkerCfg) (bool, error) {
+	return c.Internal.WorkerResume(ctx, task, res, cfg)
 }
 
 var _ api.Common = &CommonStruct{}

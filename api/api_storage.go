@@ -90,6 +90,9 @@ type StorageMiner interface {
 	// Temp api for testing
 	PledgeSector(context.Context) error
 
+	SetPledgeSectorMode(context.Context, string)
+	GetPledgeSectorMode(context.Context) string
+
 	// Get the status of a given sector by ID
 	SectorsStatus(context.Context, uint64) (SectorInfo, error)
 
@@ -106,6 +109,8 @@ type StorageMiner interface {
 	WorkerQueue(context.Context, sectorbuilder.WorkerCfg) (<-chan sectorbuilder.WorkerTask, error)
 
 	WorkerDone(ctx context.Context, task uint64, res sectorbuilder.SealRes) error
+
+	WorkerResume(ctx context.Context, task sectorbuilder.WorkerTask, res sectorbuilder.SealRes, cfg sectorbuilder.WorkerCfg) (bool, error)
 }
 
 type SectorLog struct {

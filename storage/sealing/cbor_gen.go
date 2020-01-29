@@ -395,7 +395,7 @@ func (t *SectorInfo) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{174}); err != nil {
+	if _, err := w.Write([]byte{175}); err != nil {
 		return err
 	}
 
@@ -659,6 +659,28 @@ func (t *SectorInfo) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 	if _, err := w.Write([]byte(t.LastErr)); err != nil {
+		return err
+	}
+	// t.WorkerDir (string) (string)
+	if len("WorkerDir") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"WorkerDir\" was too long")
+	}
+
+	if _, err := w.Write(cbg.CborEncodeMajorType(cbg.MajTextString, uint64(len("WorkerDir")))); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("WorkerDir")); err != nil {
+		return err
+	}
+
+	if len(t.WorkerDir) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.WorkerDir was too long")
+	}
+
+	if _, err := w.Write(cbg.CborEncodeMajorType(cbg.MajTextString, uint64(len(t.WorkerDir)))); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte(t.WorkerDir)); err != nil {
 		return err
 	}
 
@@ -940,6 +962,17 @@ func (t *SectorInfo) UnmarshalCBOR(r io.Reader) error {
 
 				t.LastErr = string(sval)
 			}
+			// t.LastErr (string) (string)
+		case "WorkerDir":
+
+			{
+				sval, err := cbg.ReadString(br)
+				if err != nil {
+					return err
+				}
+
+				t.WorkerDir = string(sval)
+			}
 			// t.Log ([]sealing.Log) (slice)
 		case "Log":
 
@@ -967,6 +1000,7 @@ func (t *SectorInfo) UnmarshalCBOR(r io.Reader) error {
 
 				t.Log[i] = v
 			}
+
 
 		default:
 			return fmt.Errorf("unknown struct field %d: '%s'", i, name)

@@ -32,6 +32,8 @@ type StorageMinerAPI struct {
 	Miner      *storage.Miner
 	BlockMiner *miner.Miner
 	Full       api.FullNode
+
+	PledgeSectorMode storage.PledgeSectorMode
 }
 
 func (sm *StorageMinerAPI) ServeRemote(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +151,18 @@ func (sm *StorageMinerAPI) PledgeSector(ctx context.Context) error {
 	return sm.Miner.PledgeSector()
 }
 
+func (sm *StorageMinerAPI) SetPledgeSectorMode(ctx context.Context, pledgeMode string) {
+	for _, v := range([]string{"close", "all", "remote", "local"}) {
+		if pledgeMode == v {
+			sm.PledgeSectorMode = storage.PledgeSectorMode(pledgeMode)
+		}
+	}
+}
+
+func (sm *StorageMinerAPI) GetPledgeSectorMode(ctx context.Context) string {
+	return string(sm.PledgeSectorMode)
+}
+
 func (sm *StorageMinerAPI) SectorsStatus(ctx context.Context, sid uint64) (api.SectorInfo, error) {
 	info, err := sm.Miner.GetSectorInfo(sid)
 	if err != nil {
@@ -226,6 +240,10 @@ func (sm *StorageMinerAPI) WorkerQueue(ctx context.Context, cfg sectorbuilder.Wo
 
 func (sm *StorageMinerAPI) WorkerDone(ctx context.Context, task uint64, res sectorbuilder.SealRes) error {
 	return sm.SectorBuilder.TaskDone(ctx, task, res)
+}
+
+func (sm *StorageMinerAPI) WorkerResume(ctx context.Context, task sectorbuilder.WorkerTask, res sectorbuilder.SealRes, cfg sectorbuilder.WorkerCfg) (bool, error) {
+	return sm.Miner.WorkerResume(ctx, task, res, cfg)
 }
 
 var _ api.StorageMiner = &StorageMinerAPI{}

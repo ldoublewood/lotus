@@ -122,6 +122,11 @@ func (s *fpostScheduler) runPost(ctx context.Context, eps uint64, ts *types.TipS
 		"eps", eps,
 		"height", ts.Height())
 
+	err = s.miner.filWorkerDirForSectors(ssi)
+	if err != nil {
+		return nil, err
+	}
+
 	faults, err := s.checkFaults(ctx, ssi)
 	if err != nil {
 		log.Errorf("Failed to declare faults: %+v", err)
@@ -207,6 +212,15 @@ func (s *fpostScheduler) submitPost(ctx context.Context, proof *actors.SubmitFal
 	sm, err := s.api.MpoolPushMessage(ctx, msg)
 	if err != nil {
 		return xerrors.Errorf("pushing message to mpool: %w", err)
+	}
+
+	rec, err := s.api.StateWaitMsg(ctx, sm.Cid())
+	if err != nil {
+		return xerrors.Errorf("waiting for submitting fallback post: %w", err)
+	}
+
+	if rec.Receipt.ExitCode != 0 {
+		return xerrors.Errorf("Submitting fallback post exit %d", rec.Receipt.ExitCode)
 	}
 
 	log.Infof("Submitted fallback post: %s", sm.Cid())
