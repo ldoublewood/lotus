@@ -70,6 +70,8 @@ var fsmPlanners = []func(events []statemachine.Event, state *SectorInfo) error{
 		on(SectorFaultReported{}, api.FaultReported),
 	),
 	api.FaultedFinal: final,
+	api.SealCommitFailed: final,
+	api.CommitFailed: final,
 }
 
 func (m *Sealing) plan(events []statemachine.Event, state *SectorInfo) (func(statemachine.Context, SectorInfo) error, error) {

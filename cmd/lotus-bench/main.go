@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -94,6 +95,11 @@ func main() {
 				Name:  "skip-unseal",
 				Usage: "skip the unseal portion of the benchmark",
 			},
+			&cli.BoolFlag{
+				Name:  "only-staging",
+				Usage: "only provide staging file",
+			},
+
 		},
 		Action: func(c *cli.Context) error {
 			if c.Bool("no-gpu") {
@@ -116,11 +122,14 @@ func main() {
 				if err != nil {
 					return err
 				}
-				defer func() {
-					if err := os.RemoveAll(tsdir); err != nil {
-						log.Warn("remove all: ", err)
-					}
-				}()
+				//in case of only-staging, don't remove staging file
+				if !c.Bool("only-staging") {
+					defer func() {
+						if err := os.RemoveAll(tsdir); err != nil {
+							log.Warn("remove all: ", err)
+						}
+					}()
+				}
 				sbdir = tsdir
 			} else {
 				exp, err := homedir.Expand(robench)
@@ -172,11 +181,17 @@ func main() {
 				start := time.Now()
 				log.Info("Writing piece into sector...")
 
-				r := rand.New(rand.NewSource(100 + int64(i)))
+				r := rand.New(rand.NewSource(42))
 
 				pi, err := sb.AddPiece(dataSize, i, r, nil)
 				if err != nil {
 					return err
+				}
+
+				fmt.Println("commp:", hex.EncodeToString(pi.CommP[:]), " Size:", pi.Size)
+
+				if c.Bool("only-staging") {
+					return nil
 				}
 
 				addpiece := time.Now()
@@ -206,7 +221,7 @@ func main() {
 				}
 
 				log.Info("Generating PoRep for sector")
-				proof, err := sb.SealCommit(context.TODO(), i, ticket, seed, pieces, pco)
+				proof, _, err := sb.SealCommit(context.TODO(), i, ticket, seed, pieces, pco)
 				if err != nil {
 					return err
 				}

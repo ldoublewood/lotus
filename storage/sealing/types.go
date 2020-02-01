@@ -84,7 +84,11 @@ type SectorInfo struct {
 	// Debug
 	LastErr string
 
+	WorkerDir string
+
 	Log []Log
+
+
 }
 
 func (t *SectorInfo) pieceInfos() []sectorbuilder.PublicPieceInfo {
