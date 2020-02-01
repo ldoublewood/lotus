@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"io"
 	"math"
 	"math/rand"
-	"runtime"
 	sectorbuilder "github.com/filecoin-project/go-sectorbuilder"
 	"golang.org/x/xerrors"
 
