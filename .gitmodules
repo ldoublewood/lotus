@@ -2,3 +2,6 @@
 	path = extern/filecoin-ffi
 	url = https://github.com/filecoin-project/filecoin-ffi.git
 	branch = master
+[submodule "extern/rust-fil-proofs"]
+	path = extern/rust-fil-proofs
+	url = ../rust-fil-proofs.git
