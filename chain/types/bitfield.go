@@ -18,6 +18,29 @@ type BitField struct {
 	bits map[uint64]struct{}
 }
 
+func (bf BitField) MarshalJSON() ([]byte, error) {
+	allint, err := bf.All(1000)
+	if err != nil {
+			return []byte{}, err
+	}
+	var result string
+	result = "["
+	len := len(allint)
+	for i:= 0 ; i < len; i ++ {
+			var str string
+			if i != len - 1 {
+					str = fmt.Sprintf("%d,", allint[i])
+			} else {
+					str = fmt.Sprintf("%d", allint[i])
+			}
+			result += str
+	}
+	result += "]"
+	log.Info("bitfield result is:" + result)
+	return []byte(result), nil
+}
+
+
 func NewBitField() BitField {
 	bf, err := NewBitFieldFromBytes([]byte{})
 	if err != nil {
