@@ -116,6 +116,7 @@ func (s *fpostScheduler) revert(ctx context.Context, newLowest *types.TipSet) er
 }
 
 func (s *fpostScheduler) update(ctx context.Context, new *types.TipSet) error {
+	log.Infof("enter update")
 	if new == nil {
 		return xerrors.Errorf("no new tipset in fpostScheduler.update")
 	}
@@ -123,6 +124,7 @@ func (s *fpostScheduler) update(ctx context.Context, new *types.TipSet) error {
 	if err != nil {
 		return err
 	}
+	log.Infof("neweps: %d, activeEPS: %d, start: %t", newEPS, s.activeEPS, start)
 
 	s.failLk.Lock()
 	if s.failed > 0 {
@@ -138,6 +140,7 @@ func (s *fpostScheduler) update(ctx context.Context, new *types.TipSet) error {
 	s.abortActivePoSt()
 
 	if newEPS != Inactive && start {
+		log.Infof("entering doPost")
 		s.doPost(ctx, newEPS, new)
 	}
 

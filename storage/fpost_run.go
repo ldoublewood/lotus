@@ -23,6 +23,7 @@ func (s *fpostScheduler) failPost(eps uint64) {
 }
 
 func (s *fpostScheduler) doPost(ctx context.Context, eps uint64, ts *types.TipSet) {
+	log.Infof("enter doPost, eps: %d", eps)
 	ctx, abort := context.WithCancel(ctx)
 
 	s.abort = abort
