@@ -5,3 +5,9 @@
 [submodule "extern/serialization-vectors"]
 	path = extern/serialization-vectors
 	url = https://github.com/filecoin-project/serialization-vectors
+[submodule "extern/sector-storage"]
+	path = extern/sector-storage
+	url = ../sector-storage
+[submodule "extern/specs-storage"]
+	path = extern/specs-storage
+	url = ../specs-storage
