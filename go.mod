@@ -31,7 +31,7 @@ require (
 	github.com/filecoin-project/sector-storage v0.0.0
 	github.com/filecoin-project/specs-actors v0.5.3
 	github.com/filecoin-project/specs-storage v0.0.0
-	github.com/filecoin-project/storage-fsm v0.0.0-20200427182014-01487d5ad3c8
+	github.com/filecoin-project/storage-fsm v0.0.0
 	github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.1
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/google/uuid v1.1.1
@@ -123,5 +123,7 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 replace github.com/filecoin-project/sector-storage => ./extern/sector-storage
 
 replace github.com/filecoin-project/specs-storage => ./extern/specs-storage
+
+replace github.com/filecoin-project/storage-fsm => ./extern/storage-fsm
 
 replace github.com/coreos/go-systemd => github.com/coreos/go-systemd/v22 v22.0.0
