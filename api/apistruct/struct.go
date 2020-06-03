@@ -236,6 +236,7 @@ type WorkerStruct struct {
 		SealCommit1    func(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) `perm:"admin"`
 		SealCommit2    func(context.Context, abi.SectorID, storage.Commit1Out) (storage.Proof, error)                                                                                                             `perm:"admin"`
 		FinalizeSector func(context.Context, abi.SectorID) error                                                                                                                                                  `perm:"admin"`
+		Complete func(context.Context, abi.SectorID) error                                                                                                                                                  `perm:"admin"`
 
 		UnsealPiece func(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error `perm:"admin"`
 		ReadPiece   func(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) error                   `perm:"admin"`
@@ -878,6 +879,10 @@ func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, id abi.S
 
 func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stores.SectorFileType, b bool, am stores.AcquireMode) error {
 	return w.Internal.Fetch(ctx, id, fileType, b, am)
+}
+
+func (w *WorkerStruct) Complete(ctx context.Context, sector abi.SectorID) error {
+	return w.Internal.Complete(ctx, sector)
 }
 
 func (w *WorkerStruct) Closing(ctx context.Context) (<-chan struct{}, error) {

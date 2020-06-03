@@ -156,6 +156,8 @@ var runCmd = &cli.Command{
 		var taskTypes []sealtasks.TaskType
 
 		taskTypes = append(taskTypes, sealtasks.TTFetch)
+		taskTypes = append(taskTypes, sealtasks.TTComplete)
+		taskTypes = append(taskTypes, sealtasks.TTFinalize)
 
 		if cctx.Bool("precommit1") {
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit1)
@@ -164,6 +166,7 @@ var runCmd = &cli.Command{
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
 		}
 		if cctx.Bool("commit") {
+			taskTypes = append(taskTypes, sealtasks.TTCommit1)
 			taskTypes = append(taskTypes, sealtasks.TTCommit2)
 		}
 
