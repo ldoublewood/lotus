@@ -5,3 +5,9 @@
 [submodule "extern/serialization-vectors"]
 	path = extern/serialization-vectors
 	url = https://github.com/filecoin-project/serialization-vectors
+[submodule "extern/rust-fil-proofs"]
+	path = extern/rust-fil-proofs
+	url = ../rust-fil-proofs
+[submodule "extern/rust-filecoin-proofs-api"]
+	path = extern/rust-filecoin-proofs-api
+	url = ../rust-filecoin-proofs-api
