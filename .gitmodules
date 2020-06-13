@@ -11,3 +11,6 @@
 [submodule "extern/rust-filecoin-proofs-api"]
 	path = extern/rust-filecoin-proofs-api
 	url = ../rust-filecoin-proofs-api
+[submodule "extern/sector-storage"]
+	path = extern/sector-storage
+	url = ../sector-storage
