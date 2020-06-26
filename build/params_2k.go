@@ -21,9 +21,9 @@ func init() {
 }
 
 // Seconds
-const BlockDelay = 2
+const BlockDelay = 20
 
-const PropagationDelay = 3
+const PropagationDelay = 30
 
 // SlashablePowerDelay is the number of epochs after ElectionPeriodStart, after
 // which the miner is slashed
