@@ -88,6 +88,10 @@ var runCmd = &cli.Command{
 			Name:  "address",
 			Usage: "Locally reachable address",
 		},
+		&cli.StringFlag{
+			Name:  "listen-address",
+			Usage: "listen address",
+		},
 		&cli.BoolFlag{
 			Name:  "no-local-storage",
 			Usage: "don't use storageminer repo for sector storage",
@@ -282,7 +286,11 @@ var runCmd = &cli.Command{
 
 		mux := mux.NewRouter()
 
-		log.Info("Setting up control endpoint at " + cctx.String("address"))
+		address := cctx.String("listen-address")
+		if address == "" {
+			address = cctx.String("address")
+		}
+		log.Info("Setting up control endpoint at " + address)
 
 		rpcServer := jsonrpc.NewServer()
 		rpcServer.Register("Filecoin", apistruct.PermissionedWorkerAPI(workerApi))
@@ -312,7 +320,7 @@ var runCmd = &cli.Command{
 			log.Warn("Graceful shutdown successful")
 		}()
 
-		nl, err := net.Listen("tcp", cctx.String("address"))
+		nl, err := net.Listen("tcp", address)
 		if err != nil {
 			return err
 		}
