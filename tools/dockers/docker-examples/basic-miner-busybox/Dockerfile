@@ -1,6 +1,8 @@
 FROM golang:1.14.1-buster
 MAINTAINER ldoublewood <ldoublewood@gmail.com>
 
+ARG FFI_BUILD_FROM_SOURCE=0
+
 ENV SRC_DIR /lotus
 
 RUN apt-get update && apt-get install -y ca-certificates llvm clang mesa-opencl-icd ocl-icd-opencl-dev jq
@@ -49,15 +51,17 @@ ARG MAKE_TARGET=all
 # Build the thing.
 RUN cd $SRC_DIR \
   && . $HOME/.cargo/env \
-  && make $MAKE_TARGET
+  && make $MAKE_TARGET bench
 
 # Now comes the actual target image, which aims to be as small as possible.
-FROM busybox:1-glibc
+#FROM busybox:1-glibc
+FROM nvidia/opencl
 MAINTAINER ldoublewood <ldoublewood@gmail.com>
 
 # Get the executable binary and TLS CAs from the build container.
 ENV SRC_DIR /lotus
 COPY --from=0 $SRC_DIR/lotus /usr/local/bin/lotus
+COPY --from=0 $SRC_DIR/bench /usr/local/bin/bench
 COPY --from=0 $SRC_DIR/lotus-* /usr/local/bin/
 COPY --from=0 /tmp/su-exec/su-exec /sbin/su-exec
 COPY --from=0 /tmp/tini /sbin/tini
@@ -82,7 +86,7 @@ ENV HOME_PATH /data
 ENV PARAMCACHE_PATH /var/tmp/filecoin-proof-parameters
 
 RUN mkdir -p $HOME_PATH $PARAMCACHE_PATH \
-  && adduser -D -h $HOME_PATH -u 1000 -G users lotus \
+  && adduser -d $HOME_PATH -u 1000 -G users lotus \
   && chown lotus:users $HOME_PATH $PARAMCACHE_PATH
 
 
