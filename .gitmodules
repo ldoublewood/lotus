@@ -14,3 +14,9 @@
 [submodule "extern/sector-storage"]
 	path = extern/sector-storage
 	url = ../sector-storage
+[submodule "extern/storage-fsm"]
+	path = extern/storage-fsm
+	url = ../storage-fsm
+[submodule "extern/specs-storage"]
+	path = extern/specs-storage
+	url = ../specs-storage
