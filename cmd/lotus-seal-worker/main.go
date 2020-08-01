@@ -101,6 +101,10 @@ var runCmd = &cli.Command{
 			Name:   "address",
 			Hidden: true,
 		},
+		//&cli.StringFlag{
+		//	Name:  "listen-address",
+		//	Usage: "listen address",
+		//},
 		&cli.BoolFlag{
 			Name:  "no-local-storage",
 			Usage: "don't use storageminer repo for sector storage",
@@ -334,6 +338,11 @@ var runCmd = &cli.Command{
 		}
 
 		mux := mux.NewRouter()
+
+		//address := cctx.String("listen-address")
+		//if address == "" {
+		//	address = cctx.String("address")
+		//}
 
 		log.Info("Setting up control endpoint at " + address)
 
