@@ -335,6 +335,11 @@ var runCmd = &cli.Command{
 
 		mux := mux.NewRouter()
 
+		//address := cctx.String("listen-address")
+		//if address == "" {
+		//	address = cctx.String("address")
+		//}
+
 		log.Info("Setting up control endpoint at " + address)
 
 		rpcServer := jsonrpc.NewServer()
