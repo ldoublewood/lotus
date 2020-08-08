@@ -98,6 +98,11 @@ var runCmd = &cli.Command{
 			Value: "0.0.0.0:3456",
 		},
 		&cli.StringFlag{
+			Name:  "bind-address",
+			Usage: "bind address",
+			Value: "0.0.0.0:3456",
+		},
+		&cli.StringFlag{
 			Name:   "address",
 			Hidden: true,
 		},
@@ -335,12 +340,12 @@ var runCmd = &cli.Command{
 
 		mux := mux.NewRouter()
 
-		//address := cctx.String("listen-address")
-		//if address == "" {
-		//	address = cctx.String("address")
-		//}
+		bindAddress := cctx.String("bind-address")
+		if bindAddress == "" {
+			bindAddress = address
+		}
 
-		log.Info("Setting up control endpoint at " + address)
+		log.Info("Setting up control endpoint at " + bindAddress)
 
 		rpcServer := jsonrpc.NewServer()
 		rpcServer.Register("Filecoin", apistruct.PermissionedWorkerAPI(workerApi))
@@ -370,7 +375,7 @@ var runCmd = &cli.Command{
 			log.Warn("Graceful shutdown successful")
 		}()
 
-		nl, err := net.Listen("tcp", address)
+		nl, err := net.Listen("tcp", bindAddress)
 		if err != nil {
 			return err
 		}
