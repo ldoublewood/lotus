@@ -33,4 +33,6 @@ type WorkerAPI interface {
 	Fetch(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error
 
 	Closing(context.Context) (<-chan struct{}, error)
+
+	CheckFsStat(ctx context.Context, spt abi.RegisteredSealProof, task sealtasks.TaskType) bool
 }
