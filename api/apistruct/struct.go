@@ -311,6 +311,8 @@ type WorkerStruct struct {
 		Fetch func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
 
 		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
+
+		CheckFsStat func(ctx context.Context, spt abi.RegisteredSealProof, task sealtasks.TaskType) bool `perm:"admin"`
 	}
 }
 
@@ -1184,6 +1186,10 @@ func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stor
 
 func (w *WorkerStruct) Closing(ctx context.Context) (<-chan struct{}, error) {
 	return w.Internal.Closing(ctx)
+}
+
+func (w *WorkerStruct) CheckFsStat(ctx context.Context, spt abi.RegisteredSealProof, task sealtasks.TaskType) bool {
+	return w.Internal.CheckFsStat(ctx, spt, task)
 }
 
 var _ api.Common = &CommonStruct{}
