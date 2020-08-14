@@ -147,13 +147,24 @@ func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.Regi
 			continue
 		}
 
-		if op == AcquireMove {
+		if op == AcquireMove || op == AcquireMoveCache{
 			if err := r.deleteFromRemote(ctx, url); err != nil {
 				log.Warnf("deleting sector %v from %s (delete %s): %+v", s, storageID, url, err)
 			}
 		}
 	}
+	if op == AcquireMoveCache {
+		for _, fileType := range PathTypes {
+			if fileType&existing == 0 {
+				continue
+			}
 
+			err := tryMoveCache(PathByType(paths, fileType), fileType.String())
+			if err != nil {
+				return SectorPaths{}, SectorPaths{}, xerrors.Errorf("try move cache error: %w", err)
+			}
+		}
+	}
 	return paths, stores, nil
 }
 
@@ -168,6 +179,25 @@ func tempFetchDest(spath string, create bool) (string, error) {
 
 	return filepath.Join(tempdir, b), nil
 }
+
+func tryMoveCache(path string, fileType string) error {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		// symlink is already done
+		return nil
+	}
+	baseName := filepath.Base(path)
+	cacheDir, found := os.LookupEnv("AQUIRE_CACHE_PATH")
+	if !found {
+		log.Panic("env AQUIRE_CACHE_PATH should be set, because AcquireMoveCache is used")
+	}
+
+	return moveAndLink(path, filepath.Join(cacheDir, fileType, baseName))
+}
+
 
 func (r *Remote) acquireFromRemote(ctx context.Context, s abi.SectorID, fileType SectorFileType, dest string) (string, error) {
 	si, err := r.index.StorageFindSector(ctx, s, fileType, 0, false)

@@ -20,6 +20,7 @@ require (
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/go-log/v2 v2.0.5
 	github.com/mattn/go-isatty v0.0.9 // indirect
+	github.com/minio/minio-go/v7 v7.0.2
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/stretchr/testify v1.6.1
 	go.opencensus.io v0.22.3
