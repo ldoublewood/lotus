@@ -18,6 +18,7 @@ type AcquireMode string
 const (
 	AcquireMove AcquireMode = "move"
 	AcquireCopy AcquireMode = "copy"
+	AcquireMoveCache AcquireMode = "movecache"
 )
 
 type Store interface {

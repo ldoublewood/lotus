@@ -6,6 +6,7 @@ import (
 	"github.com/filecoin-project/sector-storage/fsutil"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -310,7 +311,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	return out, err
 }
 
-func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage.PreCommit1Out, err error) {
+func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, noaddpiece bool) (out storage.PreCommit1Out, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -322,8 +323,16 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 	selector := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathSealing)
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
+	prepare := schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove)
+
+	if os.Getenv("NOADDPIECE") != "" && noaddpiece {
+		log.Infof("GARBAGE Manager SealPreCommit1 env NOADDPIECE:%v\n", os.Getenv("NOADDPIECE"))
+		prepare = schedNop
+
+	}
+	// err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, prepare, func(ctx context.Context, w Worker) error {
+		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces, noaddpiece)
 		if err != nil {
 			return err
 		}
@@ -337,14 +346,21 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.PreCommit1Out) (out storage.SectorCids, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
+	var mode stores.AcquireMode
+	if os.Getenv("ENABLE_PRE_COMMIT2_MOVE_CACHE") == "_yes_" {
+		mode = stores.AcquireMoveCache
+	} else {
+		mode = stores.AcquireMove
+	}
 	if err := m.index.StorageLock(ctx, sector, stores.FTSealed, stores.FTCache); err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
+	disableAllowFetch := os.Getenv("DISABLE_PRE_COMMIT2_ALLOW_FETCH") == "_yes_"
 
-	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, true)
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, !disableAllowFetch)
+
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, mode), func(ctx context.Context, w Worker) error {
 		p, err := w.SealPreCommit2(ctx, sector, phase1Out)
 		if err != nil {
 			return err
@@ -424,8 +440,9 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	if err != nil {
 		return err
 	}
-
+	if os.Getenv("USE_MINIO") != "_yes_" {
 	fetchSel := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
+
 	moveUnsealed := unsealed
 	{
 		if len(keepUnsealed) == 0 {
@@ -440,8 +457,9 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		})
 	if err != nil {
 		return xerrors.Errorf("moving sector to storage: %w", err)
-	}
 
+	}
+	}
 	return nil
 }
 

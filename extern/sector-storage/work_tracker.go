@@ -72,10 +72,10 @@ type trackedWorker struct {
 	tracker *workTracker
 }
 
-func (t *trackedWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (storage.PreCommit1Out, error) {
+func (t *trackedWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, noaddpieceflg bool) (storage.PreCommit1Out, error) {
 	defer t.tracker.track(sector, sealtasks.TTPreCommit1)()
 
-	return t.Worker.SealPreCommit1(ctx, sector, ticket, pieces)
+	return t.Worker.SealPreCommit1(ctx, sector, ticket, pieces, noaddpieceflg)
 }
 
 func (t *trackedWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, pc1o storage.PreCommit1Out) (storage.SectorCids, error) {
