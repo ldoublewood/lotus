@@ -2,7 +2,8 @@ package sealing
 
 import (
 	"context"
-
+	"io"
+	"os"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/specs-actors/actors/abi"
@@ -49,21 +50,31 @@ func (m *Sealing) PledgeSector() error {
 			return
 		}
 
-		pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
-		if err != nil {
-			log.Errorf("%+v", err)
-			return
-		}
-
-		ps := make([]Piece, len(pieces))
-		for idx := range ps {
-			ps[idx] = Piece{
-				Piece:    pieces[idx],
-				DealInfo: nil,
+		retps := make([]Piece, 0)
+		if os.Getenv("NOADDPIECE") == "" {
+			err = m.sealer.NewSector(ctx, m.minerSector(sid))
+			if err != nil {
+				log.Errorf("%+v", err)
+				return
 			}
+
+			pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
+			if err != nil {
+				log.Errorf("%+v", err)
+				return
+			}
+
+			ps := make([]Piece, len(pieces))
+			for idx := range ps {
+				ps[idx] = Piece{
+					Piece:    pieces[idx],
+					DealInfo: nil,
+				}
+			}
+			retps = ps
 		}
 
-		if err := m.newSectorCC(sid, ps); err != nil {
+		if err := m.newSectorCC(sid, retps); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}

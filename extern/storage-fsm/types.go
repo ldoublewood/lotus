@@ -59,7 +59,8 @@ type SectorInfo struct {
 	SectorType abi.RegisteredSealProof
 
 	// Packing
-	Pieces []Piece
+	Pieces        []Piece
+	NoaddPieceFlg bool
 
 	// PreCommit1
 	TicketValue   abi.SealRandomness
