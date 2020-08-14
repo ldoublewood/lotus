@@ -157,7 +157,7 @@ func presealSector(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, sid abi.Sector
 
 	fmt.Printf("sector-id: %d, piece info: %v\n", sid, pi)
 
-	in2, err := sb.SealPreCommit1(context.TODO(), sid, ticket, []abi.PieceInfo{pi})
+	in2, err := sb.SealPreCommit1(context.TODO(), sid, ticket, []abi.PieceInfo{pi}, false)
 	if err != nil {
 		return nil, xerrors.Errorf("commit: %w", err)
 	}
