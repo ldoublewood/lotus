@@ -3,6 +3,7 @@ package sealing
 import (
 	"context"
 	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -295,12 +296,21 @@ func (m *Sealing) newSectorCC(sid abi.SectorNumber, pieces []Piece) error {
 		return xerrors.Errorf("bad sector size: %w", err)
 	}
 
-	log.Infof("Creating CC sector %d", sid)
-	return m.sectors.Send(uint64(sid), SectorStartCC{
-		ID:         sid,
-		Pieces:     pieces,
-		SectorType: rt,
-	})
+	if os.Getenv("NOADDPIECE") == "" {
+		log.Infof("Creating CC sector %d", sid)
+		return m.sectors.Send(uint64(sid), SectorStartCC{
+			ID:         sid,
+			Pieces:     pieces,
+			SectorType: rt,
+		})
+	} else {
+		log.Infof("Creating CC2 sector %d", sid)
+		return m.sectors.Send(uint64(sid), SectorStartCC2{
+			ID:            sid,
+			SectorType:    rt,
+			NoaddPieceFlg: true,
+		})
+	}
 }
 
 func (m *Sealing) minerSector(num abi.SectorNumber) abi.SectorID {
