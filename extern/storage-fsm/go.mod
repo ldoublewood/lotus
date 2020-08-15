@@ -9,9 +9,9 @@ require (
 	github.com/filecoin-project/go-padreader v0.0.0-20200210211231-548257017ca6
 	github.com/filecoin-project/go-paramfetch v0.0.2-0.20200701152213-3e0f0afdc261 // indirect
 	github.com/filecoin-project/go-statemachine v0.0.0-20200730031800-c3336614d2a7
-	github.com/filecoin-project/sector-storage v0.0.0-20200810171746-eac70842d8e0
+	github.com/filecoin-project/sector-storage v0.0.0
 	github.com/filecoin-project/specs-actors v0.8.7-0.20200811223639-8db91253c07a
-	github.com/filecoin-project/specs-storage v0.1.1-0.20200730063404-f7db367e9401
+	github.com/filecoin-project/specs-storage v0.1.1
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-datastore v0.4.4
 	github.com/ipfs/go-log/v2 v2.0.5
