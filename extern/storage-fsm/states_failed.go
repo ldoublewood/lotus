@@ -62,7 +62,11 @@ func (m *Sealing) handleSealPrecommit2Failed(ctx statemachine.Context, sector Se
 	}
 
 	if sector.PreCommit2Fails > 1 {
-		return ctx.Send(SectorRetrySealPreCommit1{})
+		if os.Getenv("NOADDPIECE") == "" || len(sector.Pieces) != 0 {
+			return ctx.Send(SectorRetrySealPreCommit1{})
+		} else {
+			return ctx.Send(SectorRetrySealPreCommit1{NoaddPieceFlg: true})
+		}
 	}
 
 	return ctx.Send(SectorRetrySealPreCommit2{})
