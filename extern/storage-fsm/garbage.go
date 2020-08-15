@@ -2,7 +2,6 @@ package sealing
 
 import (
 	"context"
-	"io"
 	"os"
 	"golang.org/x/xerrors"
 
