@@ -3,7 +3,6 @@ package stores
 import (
 	"context"
 	"encoding/json"
-	"github.com/filecoin-project/lotus/build"
 	"io/ioutil"
 	"math/bits"
 	"math/rand"
