@@ -2,11 +2,9 @@ package stores
 
 import (
 	"encoding/json"
-	"github.com/raulk/clock"
 	"io"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
