@@ -282,7 +282,7 @@ func (st *Local) scanAndCopyToHdd(target string) error {
 		}
 		for _, child := range children {
 			// get cache items
-			filenames, err := getNonLinkChild(filepath.Join(child))
+			filenames, err := getNonLinkChild(filepath.Join(parent, child))
 			if err != nil {
 				return err
 			}
