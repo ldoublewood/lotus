@@ -14,14 +14,18 @@ import (
 type existingSelector struct {
 	index      stores.SectorIndex
 	sector     abi.SectorID
+	exist      stores.SectorFileType
+	ptype      stores.PathType
 	alloc      stores.SectorFileType
 	allowFetch bool
 }
 
-func newExistingSelector(index stores.SectorIndex, sector abi.SectorID, alloc stores.SectorFileType, allowFetch bool) *existingSelector {
+func newExistingSelector(index stores.SectorIndex, sector abi.SectorID, exist stores.SectorFileType, alloc stores.SectorFileType, ptype stores.PathType, allowFetch bool) *existingSelector {
 	return &existingSelector{
 		index:      index,
 		sector:     sector,
+		exist:      exist,
+		ptype:      ptype,
 		alloc:      alloc,
 		allowFetch: allowFetch,
 	}
@@ -46,7 +50,22 @@ func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt 
 		have[path.ID] = struct{}{}
 	}
 
-	best, err := s.index.StorageFindSector(ctx, s.sector, s.alloc, spt, s.allowFetch)
+	if s.alloc != stores.FTNone {
+		best, err := s.index.StorageBestAlloc(ctx, s.alloc, spt, s.ptype)
+		if err != nil {
+			return false, xerrors.Errorf("finding best alloc storage: %w", err)
+		}
+		allocOk := false
+		for _, info := range best {
+			if _, ok := have[info.ID]; ok {
+				allocOk = true
+			}
+		}
+		if !allocOk {
+			return false, nil
+		}
+	}
+	best, err := s.index.StorageFindSector(ctx, s.sector, s.exist, spt, s.allowFetch)
 	if err != nil {
 		return false, xerrors.Errorf("finding best storage: %w", err)
 	}

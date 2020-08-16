@@ -11,6 +11,8 @@ type PathType string
 const (
 	PathStorage PathType = "storage"
 	PathSealing PathType = "sealing"
+	PathNone PathType = "none"
+
 )
 
 type AcquireMode string

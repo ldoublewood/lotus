@@ -117,6 +117,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 }
 
 func (m *Sealing) Run(ctx context.Context) error {
+	time.Sleep(time.Minute * 2)
 	if err := m.restartSectors(ctx); err != nil {
 		log.Errorf("%+v", err)
 		return xerrors.Errorf("failed load sector states: %w", err)
