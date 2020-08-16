@@ -32,18 +32,12 @@ func newExistingSelector(index stores.SectorIndex, sector abi.SectorID, exist st
 }
 
 func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt abi.RegisteredSealProof, whnd *workerHandle) (bool, error) {
-	tasks, err := whnd.w.TaskTypes(ctx)
-	if err != nil {
-		return false, xerrors.Errorf("getting supported worker task types: %w", err)
-	}
+	tasks := whnd.acceptTasks
 	if _, supported := tasks[task]; !supported {
 		return false, nil
 	}
 
-	paths, err := whnd.w.Paths(ctx)
-	if err != nil {
-		return false, xerrors.Errorf("getting worker paths: %w", err)
-	}
+	paths := whnd.path
 
 	have := map[stores.ID]struct{}{}
 	for _, path := range paths {
@@ -79,7 +73,38 @@ func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt 
 	return false, nil
 }
 
-func (s *existingSelector) Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) {
+func (s *existingSelector) Cmp(ctx context.Context, task sealtasks.TaskType, spt abi.RegisteredSealProof, a, b *workerHandle) (bool, error) {
+	best, err := s.index.StorageFindSector(ctx, s.sector, s.exist, spt, s.allowFetch)
+	if err != nil {
+		return false, xerrors.Errorf("finding best storage: %w", err)
+	}
+
+
+	aHave := map[stores.ID]struct{}{}
+	for _, path := range a.path {
+		aHave[path.ID] = struct{}{}
+	}
+	bHave := map[stores.ID]struct{}{}
+	for _, path := range b.path {
+		bHave[path.ID] = struct{}{}
+	}
+
+	aExist, bExist := false, false
+	for _, info := range best {
+		if _, ok := aHave[info.ID]; ok {
+			aExist = true
+			break
+		}
+	}
+	for _, info := range best {
+		if _, ok := bHave[info.ID]; ok {
+			bExist = true
+			break
+		}
+	}
+	if aExist != bExist {
+		return aExist, nil
+	}
 	return a.active.utilization(a.info.Resources) < b.active.utilization(b.info.Resources), nil
 }
 
