@@ -2,6 +2,8 @@ package stores
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -79,4 +81,22 @@ func moveAndLink(from, to string) error {
 	}
 
 	return nil
+}
+
+
+func getNonLinkChild(parent string) ([]string, error) {
+	var out []string
+	files, err := ioutil.ReadDir(parent)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		if f.Mode()&os.ModeSymlink != 0 {
+			// symlink is already done
+			continue
+		}
+		//out = append(out, filepath.Join(parent, f.Name()))
+		out = append(out, f.Name())
+	}
+	return out, nil
 }

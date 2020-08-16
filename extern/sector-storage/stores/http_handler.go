@@ -2,9 +2,11 @@ package stores
 
 import (
 	"encoding/json"
+	"github.com/raulk/clock"
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
@@ -110,6 +112,14 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(200)
+	targetHddPath := os.Getenv("TARGET_HDD_PATH")
+	if targetHddPath != "" {
+		log.Debug("serve copy for http, obtaining hddlock")
+		handler.Local.hddLk.Lock()
+		defer handler.Local.hddLk.Unlock()
+		log.Debug("obtained hddlock in http serve")
+	}
+
 	if _, err := io.Copy(w, rd); err != nil { // TODO: default 32k buf may be too small
 		log.Error("%+v", err)
 		return

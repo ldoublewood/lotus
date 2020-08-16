@@ -3,6 +3,7 @@ package stores
 import (
 	"context"
 	"encoding/json"
+	"github.com/filecoin-project/lotus/build"
 	"io/ioutil"
 	"math/bits"
 	"math/rand"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/sector-storage/fsutil"
 	"github.com/filecoin-project/specs-actors/actors/abi"
 )
@@ -68,6 +68,8 @@ type Local struct {
 	paths map[ID]*path
 
 	localLk sync.RWMutex
+
+	hddLk sync.Mutex
 }
 
 type path struct {
@@ -226,6 +228,10 @@ func (st *Local) open(ctx context.Context) error {
 	}
 
 	go st.reportHealth(ctx)
+	targetHddPath := os.Getenv("TARGET_HDD_PATH")
+	if targetHddPath != "" {
+		go st.dropHdd(ctx, targetHddPath)
+	}
 
 	return nil
 }
@@ -259,6 +265,57 @@ func (st *Local) reportHealth(ctx context.Context) {
 			if err := st.index.StorageReportHealth(ctx, id, report); err != nil {
 				log.Warnf("error reporting storage health for %s: %+v", id, report)
 			}
+		}
+	}
+}
+
+func (st *Local) scanAndCopyToHdd(target string) error {
+	log.Debug("doing scan and copy to hdd, obtaining hddlock")
+	st.hddLk.Lock()
+	log.Debug("obtained hddlock in scan and copy")
+	defer st.hddLk.Unlock()
+	for _, path := range st.paths {
+		parent := filepath.Join(path.local, FTCache.String())
+		// get sectors under cache
+		children, err := getNonLinkChild(parent)
+		if err != nil {
+			return err
+		}
+		for _, child := range children {
+			// get cache items
+			filenames, err := getNonLinkChild(filepath.Join(child))
+			if err != nil {
+				return err
+			}
+
+			for _, filename := range filenames {
+				from := filepath.Join(child, filename)
+				to := filepath.Join(target, filename)
+	            err := moveAndLink(from, to)
+	            if err != nil {
+	            	return nil
+				}
+				// only do one for once loop
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
+func (st *Local) dropHdd(ctx context.Context, target string) {
+	// randomize interval by ~10%
+	interval := (DropHddInterval*100_000 + time.Duration(rand.Int63n(10_000))) / 100_000
+
+	for {
+		select {
+		case <-time.After(interval):
+		case <-ctx.Done():
+			return
+		}
+		err := st.scanAndCopyToHdd(target)
+		if err != nil {
+			log.Warnf("scan and copy to hdd: %+v", err)
 		}
 	}
 }

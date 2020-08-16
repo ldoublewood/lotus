@@ -16,6 +16,7 @@ import (
 )
 
 var HeartbeatInterval = 10 * time.Second
+var DropHddInterval = 5 * time.Second
 var SkippedHeartbeatThresh = HeartbeatInterval * 5
 
 // ID identifies sector storage by UUID. One sector storage should map to one
