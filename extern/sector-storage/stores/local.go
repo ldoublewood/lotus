@@ -288,9 +288,19 @@ func (st *Local) scanAndCopyToHdd(target string) error {
 			}
 
 			for _, filename := range filenames {
-				from := filepath.Join(child, filename)
-				to := filepath.Join(target, filename)
-	            err := moveAndLink(from, to)
+				from := filepath.Join(parent, child, filename)
+				destDir := filepath.Join(target, child)
+				to := filepath.Join(destDir, filename)
+				_, err := os.Stat(destDir)
+				if err != nil {
+					if os.IsNotExist(err){
+						errm := os.Mkdir(destDir, 0755)
+						if errm != nil {
+							return errm
+						}
+					}
+				}
+	            err = moveAndLink(from, to)
 	            if err != nil {
 	            	return nil
 				}
