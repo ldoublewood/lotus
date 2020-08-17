@@ -138,7 +138,7 @@ func (handler *FetchHandler) remoteDeleteSector(w http.ResponseWriter, r *http.R
 		log.Error("%+v", err)
 		w.WriteHeader(500)
 		return
-	}
+	}F
 
 	if err := handler.Remove(r.Context(), id, ft, false); err != nil {
 		log.Error("%+v", err)

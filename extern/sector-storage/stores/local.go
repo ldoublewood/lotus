@@ -607,10 +607,29 @@ func (st *Local) removeSector(ctx context.Context, sid abi.SectorID, typ SectorF
 	spath := p.sectorPath(sid, typ)
 	log.Infof("remove %s", spath)
 
-	if err := os.RemoveAll(spath); err != nil {
-		log.Errorf("removing sector (%v) from %s: %+v", sid, spath, err)
+	fileInfo, err := os.Stat(spath)
+	if err != nil {
+		return xerrors.Errorf("stat %s: %w", spath, err)
+	}
+	var realpath string
+	if fileInfo.Mode() & os.ModeSymlink != 0 {
+		realpath, err = filepath.EvalSymlinks(spath)
+		if err != nil {
+			return xerrors.Errorf("eval symlinks %s: %w", spath, err)
+		}
+	} else {
+		realpath = spath
 	}
 
+	if err := os.RemoveAll(realpath); err != nil {
+		log.Errorf("removing sector (%v) from %s: %+v", sid, realpath, err)
+	}
+	// in case of softlink, should delete the link also
+	if spath != realpath {
+		if err := os.RemoveAll(spath); err != nil {
+			log.Errorf("removing sector link (%v) from %s: %+v", sid, spath, err)
+		}
+	}
 	return nil
 }
 
