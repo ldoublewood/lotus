@@ -72,8 +72,22 @@ func writeTarDirectory(dir string, w io.Writer) error {
 		if err := tw.WriteHeader(h); err != nil {
 			return xerrors.Errorf("wiritng header for file %s: %w", file.Name(), err)
 		}
+		filename := filepath.Join(dir, file.Name())
+		fileInfo, err := os.Stat(filename)
+		if err != nil {
+			return xerrors.Errorf("stat %s: %w", filename, err)
+		}
+		var realpath string
+		if fileInfo.Mode() & os.ModeSymlink != 0 {
+			realpath, err = filepath.EvalSymlinks(filename)
+			if err != nil {
+				return xerrors.Errorf("eval symlinks %s: %w", filename, err)
+			}
+		} else {
+			realpath = filename
+		}
 
-		f, err := os.OpenFile(filepath.Join(dir, file.Name()), os.O_RDONLY, 644) // nolint
+		f, err := os.OpenFile(realpath, os.O_RDONLY, 644) // nolint
 		if err != nil {
 			return xerrors.Errorf("opening %s for reading: %w", file.Name(), err)
 		}

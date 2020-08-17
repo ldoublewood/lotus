@@ -83,20 +83,47 @@ func moveAndLink(from, to string) error {
 	return nil
 }
 
+func forceLink(from, to string) error {
+	from, err := homedir.Expand(from)
+	if err != nil {
+		return xerrors.Errorf("move: expanding from: %w", err)
+	}
 
-func getNonLinkChild(parent string) ([]string, error) {
-	var out []string
+	to, err = homedir.Expand(to)
+	if err != nil {
+		return xerrors.Errorf("move: expanding to: %w", err)
+	}
+
+	if filepath.Base(from) != filepath.Base(to) {
+		return xerrors.Errorf("move: base names must match ('%s' != '%s')", filepath.Base(from), filepath.Base(to))
+	}
+
+	log.Debugw("force link", "from", from, "to", to)
+
+	var errOut bytes.Buffer
+
+	cmd := exec.Command("/usr/bin/env", "ln", "-sf", from, to)
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return xerrors.Errorf("exec ln -sf (stderr: %s): %w", strings.TrimSpace(errOut.String()), err)
+	}
+
+	return nil
+}
+
+func getChildren(parent string) ([]string, []string, error) {
+	var nonlinks, links []string
 	files, err := ioutil.ReadDir(parent)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, f := range files {
 		if f.Mode()&os.ModeSymlink != 0 {
-			// symlink is already done
-			continue
+			// symlink
+			links = append(links, f.Name())
+		} else {
+			nonlinks  = append(nonlinks, f.Name())
 		}
-		//out = append(out, filepath.Join(parent, f.Name()))
-		out = append(out, f.Name())
 	}
-	return out, nil
+	return nonlinks, links, nil
 }

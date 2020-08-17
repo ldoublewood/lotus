@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/xerrors"
 	"github.com/filecoin-project/sector-storage/fsutil"
 	"github.com/filecoin-project/specs-actors/actors/abi"
+	"golang.org/x/xerrors"
 )
 
 type StoragePath struct {
@@ -269,47 +269,75 @@ func (st *Local) reportHealth(ctx context.Context) {
 }
 
 func (st *Local) scanAndCopyToHdd(target string) error {
-	log.Debug("doing scan and copy to hdd, obtaining hddlock")
 	st.hddLk.Lock()
-	log.Debug("obtained hddlock in scan and copy")
 	defer st.hddLk.Unlock()
 	for _, path := range st.paths {
 		parent := filepath.Join(path.local, FTCache.String())
 		// get sectors under cache
-		children, err := getNonLinkChild(parent)
+		children, _, err := getChildren(parent)
 		if err != nil {
 			return err
 		}
-		for _, child := range children {
-			// get cache items
-			filenames, err := getNonLinkChild(filepath.Join(parent, child))
+
+		for _, sector := range children {
+			if sector == FetchTempSubdir {
+				continue
+			}
+			hddDir := filepath.Join(target, sector)
+			_, err := os.Stat(hddDir)
+			if err != nil {
+				if os.IsNotExist(err){
+					errm := os.Mkdir(hddDir, 0755)
+					if errm != nil {
+						return errm
+					}
+				}
+			}
+
+			memDir := filepath.Join(parent, sector)
+
+				// get cache items
+			filenames, links, err := getChildren(filepath.Join(parent, sector))
 			if err != nil {
 				return err
 			}
 
 			for _, filename := range filenames {
-				from := filepath.Join(parent, child, filename)
-				destDir := filepath.Join(target, child)
-				to := filepath.Join(destDir, filename)
-				_, err := os.Stat(destDir)
-				if err != nil {
-					if os.IsNotExist(err){
-						errm := os.Mkdir(destDir, 0755)
-						if errm != nil {
-							return errm
-						}
-					}
-				}
+				from := filepath.Join(memDir, filename)
+				to := filepath.Join(hddDir, filename)
 	            err = moveAndLink(from, to)
 	            if err != nil {
 	            	return nil
 				}
-				// only do one for once loop
-				return nil
 			}
+
+			for _, filename := range append(filenames, links...) {
+				if st.isLastLayer(filename) {
+					err := forceLink(hddDir, memDir)
+					if err != nil {
+						return err
+					}
+					// sector completed
+					break
+				}
+
+			}
+
 		}
 	}
 	return nil
+}
+
+func (st *Local) isLastLayer(filename string) bool {
+	sectorsize := os.Getenv("SECTOR_SIZE")
+	if sectorsize == "" || sectorsize == "32GiB" {
+		return filename == "sc-02-data-layer-11.dat"
+	} else if sectorsize == "512MiB" {
+		return filename == "sc-02-data-layer-11.dat"
+	} else {
+		log.Errorf("not supported sector size: %d", sectorsize)
+		return true
+	}
 }
 
 func (st *Local) dropHdd(ctx context.Context, target string) {
