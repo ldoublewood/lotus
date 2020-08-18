@@ -76,6 +76,18 @@ func (evt SectorStartCC) apply(state *SectorInfo) {
 	state.SectorType = evt.SectorType
 }
 
+type SectorStartCC2 struct {
+	ID            abi.SectorNumber
+	SectorType    abi.RegisteredSealProof
+	NoaddPieceFlg bool
+}
+
+func (evt SectorStartCC2) apply(state *SectorInfo) {
+	state.SectorNumber = evt.ID
+	state.SectorType = evt.SectorType
+	state.NoaddPieceFlg = evt.NoaddPieceFlg
+}
+
 type SectorAddPiece struct {
 	NewPiece Piece
 }
@@ -220,9 +232,13 @@ func (evt SectorFinalizeFailed) apply(*SectorInfo)                        {}
 
 // Failed state recovery
 
-type SectorRetrySealPreCommit1 struct{}
+type SectorRetrySealPreCommit1 struct {
+	NoaddPieceFlg bool
+}
 
-func (evt SectorRetrySealPreCommit1) apply(state *SectorInfo) {}
+func (evt SectorRetrySealPreCommit1) apply(state *SectorInfo) {
+	state.NoaddPieceFlg = evt.NoaddPieceFlg
+}
 
 type SectorRetrySealPreCommit2 struct{}
 
