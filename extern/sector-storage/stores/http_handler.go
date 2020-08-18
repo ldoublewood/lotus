@@ -114,6 +114,12 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 	if targetHddPath != "" {
 		handler.Local.hddLk.Lock()
 		defer handler.Local.hddLk.Unlock()
+		err := handler.Local.resolveLink(targetHddPath)
+		if err != nil {
+			log.Error("%+v", err)
+			w.WriteHeader(500)
+			return
+		}
 	}
 
 	if _, err := io.Copy(w, rd); err != nil { // TODO: default 32k buf may be too small

@@ -271,6 +271,9 @@ func (st *Local) reportHealth(ctx context.Context) {
 func (st *Local) scanAndCopyToHdd(target string) error {
 	st.hddLk.Lock()
 	defer st.hddLk.Unlock()
+	return st.doScanAndCopyToHdd(target)
+}
+func (st *Local) doScanAndCopyToHdd(target string) error {
 	for _, path := range st.paths {
 		parent := filepath.Join(path.local, FTCache.String())
 		// get sectors under cache
@@ -296,7 +299,7 @@ func (st *Local) scanAndCopyToHdd(target string) error {
 
 			memDir := filepath.Join(parent, sector)
 
-				// get cache items
+			// get cache items
 			filenames, links, err := getChildren(filepath.Join(parent, sector))
 			if err != nil {
 				return err
@@ -305,13 +308,57 @@ func (st *Local) scanAndCopyToHdd(target string) error {
 			for _, filename := range filenames {
 				from := filepath.Join(memDir, filename)
 				to := filepath.Join(hddDir, filename)
-	            err = moveAndLink(from, to)
-	            if err != nil {
-	            	return nil
+				err = moveAndLink(from, to)
+				if err != nil {
+					return nil
 				}
 			}
 
+			// resolve link
 			for _, filename := range append(filenames, links...) {
+				if st.isLastLayer(filename) {
+					err := forceLink(hddDir, memDir)
+					if err != nil {
+						return err
+					}
+					// sector completed
+					break
+				}
+
+			}
+
+		}
+	}
+	return nil
+}
+
+func (st *Local) resolveLink(target string) error {
+	for _, path := range st.paths {
+		parent := filepath.Join(path.local, FTCache.String())
+		// get sectors under cache
+		children, _, err := getChildren(parent)
+		if err != nil {
+			return err
+		}
+
+		for _, sector := range children {
+			if sector == FetchTempSubdir {
+				continue
+			}
+			hddDir := filepath.Join(target, sector)
+			memDir := filepath.Join(parent, sector)
+
+			// get cache items
+			nonlinks, links, err := getChildren(filepath.Join(parent, sector))
+			if err != nil {
+				return err
+			}
+			// normally file means not completed
+			if len(nonlinks) != 0 {
+				continue
+			}
+
+			for _, filename := range links {
 				if st.isLastLayer(filename) {
 					err := forceLink(hddDir, memDir)
 					if err != nil {

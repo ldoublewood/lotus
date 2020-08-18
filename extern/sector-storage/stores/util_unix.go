@@ -99,6 +99,10 @@ func forceLink(from, to string) error {
 	}
 
 	log.Debugw("force link", "from", from, "to", to)
+	err = os.RemoveAll(to)
+	if err != nil {
+		log.Errorf("removing dest dir %s: %+v", to, err)
+	}
 
 	var errOut bytes.Buffer
 
