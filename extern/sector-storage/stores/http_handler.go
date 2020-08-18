@@ -94,7 +94,17 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(500)
 		return
 	}
-
+	targetHddPath := os.Getenv("TARGET_HDD_PATH")
+	if targetHddPath != "" {
+		handler.Local.hddLk.Lock()
+		defer handler.Local.hddLk.Unlock()
+		err := handler.Local.resolveLink(targetHddPath)
+		if err != nil {
+			log.Error("%+v", err)
+			w.WriteHeader(500)
+			return
+		}
+	}
 	var rd io.Reader
 	if stat.IsDir() {
 		rd, err = tarutil.TarDirectory(path)
@@ -110,17 +120,6 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(200)
-	targetHddPath := os.Getenv("TARGET_HDD_PATH")
-	if targetHddPath != "" {
-		handler.Local.hddLk.Lock()
-		defer handler.Local.hddLk.Unlock()
-		err := handler.Local.resolveLink(targetHddPath)
-		if err != nil {
-			log.Error("%+v", err)
-			w.WriteHeader(500)
-			return
-		}
-	}
 
 	if _, err := io.Copy(w, rd); err != nil { // TODO: default 32k buf may be too small
 		log.Error("%+v", err)
