@@ -380,7 +380,7 @@ func (st *Local) isLastLayer(filename string) bool {
 	if sectorsize == "" || sectorsize == "32GiB" {
 		return filename == "sc-02-data-layer-11.dat"
 	} else if sectorsize == "512MiB" {
-		return filename == "sc-02-data-layer-11.dat"
+		return filename == "sc-02-data-layer-2.dat"
 	} else {
 		log.Errorf("not supported sector size: %d", sectorsize)
 		return true
