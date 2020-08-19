@@ -49,7 +49,7 @@ type WorkerAction func(ctx context.Context, w Worker) error
 type WorkerSelector interface {
 	Ok(ctx context.Context, task sealtasks.TaskType, spt abi.RegisteredSealProof, a *workerHandle) (bool, error) // true if worker is acceptable for performing a task
 
-	Cmp(ctx context.Context, task sealtasks.TaskType, spt abi.RegisteredSealProof, a, b *workerHandle) (bool, error) // true if a is preferred over b
+	Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) // true if a is preferred over b
 }
 
 type scheduler struct {
@@ -355,7 +355,7 @@ func (sh *scheduler) trySched() {
 			rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
 			defer cancel()
 
-			r, err := task.sel.Cmp(rpcCtx, task.taskType, sh.spt, wi, wj)
+			r, err := task.sel.Cmp(rpcCtx, task.taskType, wi, wj)
 			if err != nil {
 				log.Error("selecting best worker: %s", err)
 			}

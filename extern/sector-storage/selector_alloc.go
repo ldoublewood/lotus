@@ -58,7 +58,7 @@ func (s *allocSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt abi
 	return false, nil
 }
 
-func (s *allocSelector) Cmp(ctx context.Context, task sealtasks.TaskType, spt abi.RegisteredSealProof, a, b *workerHandle) (bool, error) {
+func (s *allocSelector) Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) {
 	return a.active.utilization(a.info.Resources) < b.active.utilization(b.info.Resources), nil
 }
 
