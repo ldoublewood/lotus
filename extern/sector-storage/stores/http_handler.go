@@ -98,7 +98,8 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 	if targetHddPath != "" {
 		handler.Local.hddLk.Lock()
 		defer handler.Local.hddLk.Unlock()
-		err := handler.Local.resolveLink(targetHddPath)
+		//err := handler.Local.resolveLink(targetHddPath)
+		err := handler.Local.doScanAndCopyToHdd(targetHddPath)
 		if err != nil {
 			log.Error("%+v", err)
 			w.WriteHeader(500)
