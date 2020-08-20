@@ -14,11 +14,11 @@ func (a *activeResources) withResources(id WorkerID, wr storiface.WorkerResource
 		a.cond.Wait()
 	}
 
-	a.add(wr, r)
+	used := a.add(wr, r)
 
 	err := cb()
 
-	a.free(wr, r)
+	a.free(used)
 	if a.cond != nil {
 		a.cond.Broadcast()
 	}
@@ -26,30 +26,25 @@ func (a *activeResources) withResources(id WorkerID, wr storiface.WorkerResource
 	return err
 }
 
-func (a *activeResources) add(wr storiface.WorkerResources, r Resources) {
-	a.gpuUsed = r.CanGPU
-	if r.MultiThread() {
-		a.cpuUse += wr.CPUs
-	} else {
-		a.cpuUse += uint64(r.Threads)
-	}
-
+func (a *activeResources) add(wr storiface.WorkerResources, r Resources) *usedResources {
+	cpu, gpu := getNeedGpuCpu(r, wr, a)
+	a.cpuUse += cpu
+	a.gpuUse += gpu
 	a.memUsedMin += r.MinMemory
 	a.memUsedMax += r.MaxMemory
+	return &usedResources{
+		memUsedMin: r.MinMemory,
+		memUsedMax: r.MaxMemory,
+		cpuUse:     cpu,
+		gpuUse:     gpu,
+	}
 }
 
-func (a *activeResources) free(wr storiface.WorkerResources, r Resources) {
-	if r.CanGPU {
-		a.gpuUsed = false
-	}
-	if r.MultiThread() {
-		a.cpuUse -= wr.CPUs
-	} else {
-		a.cpuUse -= uint64(r.Threads)
-	}
-
-	a.memUsedMin -= r.MinMemory
-	a.memUsedMax -= r.MaxMemory
+func (a *activeResources) free(used *usedResources) {
+	a.memUsedMin -= used.memUsedMin
+	a.memUsedMax -= used.memUsedMax
+	a.cpuUse -= used.cpuUse
+	a.gpuUse -= used.gpuUse
 }
 
 func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, res storiface.WorkerResources) bool {
@@ -67,24 +62,16 @@ func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, res 
 		log.Debugf("sched: not scheduling on worker %d; not enough virtual memory - need: %dM, have %dM", wid, maxNeedMem/mib, (res.MemSwap+res.MemPhysical)/mib)
 		return false
 	}
+	needCpu, needGpu := getNeedGpuCpu(needRes, res, a)
+	gpus := getVirtualGpu(res)
 
-	if needRes.MultiThread() {
-		if a.cpuUse > 0 {
-			log.Debugf("sched: not scheduling on worker %d; multicore process needs %d threads, %d in use, target %d", wid, res.CPUs, a.cpuUse, res.CPUs)
-			return false
-		}
-	} else {
-		if a.cpuUse+uint64(needRes.Threads) > res.CPUs {
-			log.Debugf("sched: not scheduling on worker %d; not enough threads, need %d, %d in use, target %d", wid, needRes.Threads, a.cpuUse, res.CPUs)
-			return false
-		}
+	if a.cpuUse+needCpu > res.CPUs {
+		log.Debugf("sched: not scheduling on worker %d; not enough threads, need %d, %d in use, target %d", wid, needRes.Threads, a.cpuUse, res.CPUs)
+		return false
 	}
-
-	if len(res.GPUs) > 0 && needRes.CanGPU {
-		if a.gpuUsed {
-			log.Debugf("sched: not scheduling on worker %d; GPU in use", wid)
-			return false
-		}
+	if a.gpuUse+needGpu > gpus {
+		log.Debugf("sched: not scheduling on worker %d; not enough threads, need %d, %d in use, target %d", wid, needRes.Threads, a.gpuUse, len(res.GPUs))
+		return false
 	}
 
 	return true
