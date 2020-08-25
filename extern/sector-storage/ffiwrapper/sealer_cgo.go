@@ -12,8 +12,12 @@ import (
 	"io/ioutil"
 	"math/bits"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
+
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
@@ -547,6 +551,38 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
 }
 
+func copy(from, to string) error {
+	from, err := homedir.Expand(from)
+	if err != nil {
+		return xerrors.Errorf("copy: expanding from: %w", err)
+	}
+
+	to, err = homedir.Expand(to)
+	if err != nil {
+		return xerrors.Errorf("copy: expanding to: %w", err)
+	}
+
+	if filepath.Base(from) != filepath.Base(to) {
+		return xerrors.Errorf("copy: base names must match ('%s' != '%s')", filepath.Base(from), filepath.Base(to))
+	}
+
+	log.Debugw("copy sector data", "from", from, "to", to)
+
+	toDir := filepath.Dir(to)
+
+	// `mv` has decades of experience in moving files quickly; don't pretend we
+	//  can do better
+
+	var errOut bytes.Buffer
+	cmd := exec.Command("/usr/bin/env", "/bin/cp", "-fr", toDir, from) // nolint
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return xerrors.Errorf("exec cp (stderr: %s): %w", strings.TrimSpace(errOut.String()), err)
+	}
+
+	return nil
+}
+
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
 	if len(keepUnsealed) > 0 {
 		maxPieceSize := abi.PaddedPieceSize(sb.ssize)
@@ -617,6 +653,21 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 
 	if sb.mc != nil {
 		return sb.uploadToStore(paths, sector)
+	}
+	if os.Getenv("CEPH_PATH") != "" {
+		files, err := ioutil.ReadDir(paths.Cache)
+		if err != nil {
+			return err
+		}
+		if len(files) > 0 {
+			err = copy(paths.Cache, filepath.Join(os.Getenv("CEPH_PATH"), stores.FTCache.String(), stores.SectorName(sector)))
+		}
+		err = copy(paths.Sealed, filepath.Join(os.Getenv("CEPH_PATH"), stores.FTSealed.String(), stores.SectorName(sector)))
+		return err
+	} else {
+		if sb.mc != nil {
+			return sb.uploadToStore(paths, sector)
+		}
 	}
 	return nil
 }
