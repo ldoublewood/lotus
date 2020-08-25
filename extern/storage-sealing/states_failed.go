@@ -49,7 +49,14 @@ func (m *Sealing) handleSealPrecommit1Failed(ctx statemachine.Context, sector Se
 		return err
 	}
 
-	if os.Getenv("NOADDPIECE") == "" {
+	hasdeals := false
+	if len(sector.Pieces) > 0 {
+		if sector.Pieces[0].DealInfo != nil {
+			hasdeals = true
+		}
+	}
+
+	if os.Getenv("NOADDPIECE") == "" || hasdeals {
 		return ctx.Send(SectorRetrySealPreCommit1{})
 	} else {
 		return ctx.Send(SectorRetrySealPreCommit1{NoaddPieceFlg: true})
@@ -62,7 +69,15 @@ func (m *Sealing) handleSealPrecommit2Failed(ctx statemachine.Context, sector Se
 	}
 
 	if sector.PreCommit2Fails > 1 {
-		if os.Getenv("NOADDPIECE") == "" || len(sector.Pieces) != 0 {
+
+		hasdeals := false
+		if len(sector.Pieces) > 0 {
+			if sector.Pieces[0].DealInfo != nil {
+				hasdeals = true
+			}
+		}
+
+		if os.Getenv("NOADDPIECE") == "" || hasdeals {
 			return ctx.Send(SectorRetrySealPreCommit1{})
 		} else {
 			return ctx.Send(SectorRetrySealPreCommit1{NoaddPieceFlg: true})
