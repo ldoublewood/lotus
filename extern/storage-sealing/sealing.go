@@ -1,6 +1,7 @@
 package sealing
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -380,9 +381,18 @@ func (m *Sealing) newSectorCC(sid abi.SectorNumber, pieces []Piece) error {
 		})
 	} else {
 		log.Infof("Creating CC2 sector %d", sid)
+
+		if os.Getenv("SECTORINFO") != "" {
+			buf := bytes.NewBufferString(`{"/":"` + os.Getenv("SECTORINFO") + `"}`)
+			c := new(cid.Cid)
+			c.UnmarshalJSON(buf.Bytes())
+			pp := Piece{Piece: abi.PieceInfo{Size: abi.PaddedPieceSize(m.sealer.SectorSize()), PieceCID: *c}, DealInfo: nil}
+			pieces = append(pieces, pp)
+		}
 		return m.sectors.Send(uint64(sid), SectorStartCC2{
 			ID:            sid,
 			SectorType:    rt,
+			Pieces:        pieces,
 			NoaddPieceFlg: true,
 		})
 	}
