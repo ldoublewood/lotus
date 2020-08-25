@@ -59,6 +59,14 @@ func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, 
 		}
 	}
 
+	if _, ok := os.LookupEnv("CEPH_PATH"); ok {
+		var found bool
+		minerStorageId, found = os.LookupEnv("SHARED_MINER_STORAGE_ID")
+		if !found {
+			log.Panic("env SHARED_MINER_STORAGE_ID should be set, because env CEPH_PATH is set")
+		}
+	}
+
 	return &LocalWorker{
 		scfg: &ffiwrapper.Config{
 			SealProofType: wcfg.SealProof,
