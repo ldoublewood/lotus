@@ -568,13 +568,12 @@ func copy(from, to string) error {
 
 	log.Debugw("copy sector data", "from", from, "to", to)
 
-	toDir := filepath.Dir(to)
 
 	// `mv` has decades of experience in moving files quickly; don't pretend we
 	//  can do better
 
 	var errOut bytes.Buffer
-	cmd := exec.Command("/usr/bin/env", "/bin/cp", "-fr", toDir, from) // nolint
+	cmd := exec.Command("/usr/bin/env", "/bin/cp", "-fr", from, to) // nolint
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return xerrors.Errorf("exec cp (stderr: %s): %w", strings.TrimSpace(errOut.String()), err)
