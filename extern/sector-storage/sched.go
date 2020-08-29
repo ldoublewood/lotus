@@ -698,8 +698,8 @@ func (sh *scheduler) workerCompactWindows(worker *workerHandle, wid WorkerID) in
 
 				moved = append(moved, ti)
 				lower.todo = append(lower.todo, todo)
-				lower.allocated.add(worker.info.Resources, needRes)
-				window.allocated.free(worker.info.Resources, needRes)
+				added := lower.allocated.add(worker.info.Resources, needRes)
+				window.allocated.free(added)
 			}
 
 			if len(moved) > 0 {

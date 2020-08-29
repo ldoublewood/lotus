@@ -456,7 +456,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	if err != nil {
 		return err
 	}
-	if os.Getenv("USE_MINIO") != "_yes_" {
+	if os.Getenv("USE_MINIO") != "_yes_" && os.Getenv("USE_CEPH") != "_yes_" {
 	fetchSel := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
 
 	moveUnsealed := unsealed
