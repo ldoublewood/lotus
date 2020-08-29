@@ -567,6 +567,22 @@ func (t *SectorInfo) MarshalCBOR(w io.Writer) error {
 		}
 	}
 
+	// t.NoaddPieceFlg (bool) (bool)
+	if len("NoaddPieceFlg") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"NoaddPieceFlg\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("NoaddPieceFlg"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("NoaddPieceFlg")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.NoaddPieceFlg); err != nil {
+		return err
+	}
+
 	// t.TicketValue (abi.SealRandomness) (slice)
 	if len("TicketValue") > cbg.MaxLength {
 		return xerrors.Errorf("Value in field \"TicketValue\" was too long")
@@ -1093,6 +1109,24 @@ func (t *SectorInfo) UnmarshalCBOR(r io.Reader) error {
 				t.Pieces[i] = v
 			}
 
+			// t.NoaddPieceFlg (bool) (bool)
+		case "NoaddPieceFlg":
+
+			maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.NoaddPieceFlg = false
+			case 21:
+				t.NoaddPieceFlg = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
 			// t.TicketValue (abi.SealRandomness) (slice)
 		case "TicketValue":
 

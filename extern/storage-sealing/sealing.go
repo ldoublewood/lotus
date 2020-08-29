@@ -1,10 +1,12 @@
 package sealing
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"math"
+	"os"
 	"sync"
 	"time"
 
@@ -129,6 +131,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 }
 
 func (m *Sealing) Run(ctx context.Context) error {
+	time.Sleep(time.Minute * 2)
 	if err := m.restartSectors(ctx); err != nil {
 		log.Errorf("%+v", err)
 		return xerrors.Errorf("failed load sector states: %w", err)
@@ -379,12 +382,30 @@ func (m *Sealing) newSectorCC(sid abi.SectorNumber, pieces []Piece) error {
 		return xerrors.Errorf("bad sector size: %w", err)
 	}
 
-	log.Infof("Creating CC sector %d", sid)
-	return m.sectors.Send(uint64(sid), SectorStartCC{
-		ID:         sid,
-		Pieces:     pieces,
-		SectorType: rt,
-	})
+	if os.Getenv("NOADDPIECE") == "" {
+		log.Infof("Creating CC sector %d", sid)
+		return m.sectors.Send(uint64(sid), SectorStartCC{
+			ID:         sid,
+			Pieces:     pieces,
+			SectorType: rt,
+		})
+	} else {
+		log.Infof("Creating CC2 sector %d", sid)
+
+		if os.Getenv("SECTORINFO") != "" {
+			buf := bytes.NewBufferString(`{"/":"` + os.Getenv("SECTORINFO") + `"}`)
+			c := new(cid.Cid)
+			c.UnmarshalJSON(buf.Bytes())
+			pp := Piece{Piece: abi.PieceInfo{Size: abi.PaddedPieceSize(m.sealer.SectorSize()), PieceCID: *c}, DealInfo: nil}
+			pieces = append(pieces, pp)
+		}
+		return m.sectors.Send(uint64(sid), SectorStartCC2{
+			ID:            sid,
+			SectorType:    rt,
+			Pieces:        pieces,
+			NoaddPieceFlg: true,
+		})
+	}
 }
 
 func (m *Sealing) minerSector(num abi.SectorNumber) abi.SectorID {
