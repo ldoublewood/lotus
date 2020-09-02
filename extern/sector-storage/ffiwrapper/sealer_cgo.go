@@ -649,16 +649,31 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		return err
 	}
 
-	if os.Getenv("CEPH_PATH") != "" {
+	cephPath := os.Getenv("CEPH_PATH")
+	if cephPath != "" {
 		files, err := ioutil.ReadDir(paths.Cache)
 		if err != nil {
 			return err
 		}
-		if len(files) > 0 {
-			err = copy(paths.Cache, filepath.Join(os.Getenv("CEPH_PATH"), stores.FTCache.String(), stores.SectorName(sector)))
+
+		if len(files) == 0 {
+			return xerrors.Errorf("cache path is empty: %s", paths.Cache)
 		}
-		err = copy(paths.Sealed, filepath.Join(os.Getenv("CEPH_PATH"), stores.FTSealed.String(), stores.SectorName(sector)))
-		return err
+		err = copy(paths.Cache, filepath.Join(cephPath, stores.FTCache.String(), stores.SectorName(sector)))
+		if err != nil {
+			return err
+		}
+		err = copy(paths.Sealed, filepath.Join(cephPath, stores.FTSealed.String(), stores.SectorName(sector)))
+		if err != nil {
+			return err
+		}
+		if len(keepUnsealed) > 0 {
+			err = copy(paths.Sealed, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
+			if err != nil {
+				return err
+			}
+
+		}
 	} else {
 		if sb.mc != nil {
 			return sb.uploadToStore(paths, sector)
