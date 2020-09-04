@@ -120,8 +120,12 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	go m.sched.runSched()
 
 	localTasks := []sealtasks.TaskType{
-		sealtasks.TTCommit1, sealtasks.TTFinalize, sealtasks.TTFetch, sealtasks.TTReadUnsealed,
+		sealtasks.TTCommit1, sealtasks.TTFetch, sealtasks.TTReadUnsealed,
 	}
+	if os.Getenv("USE_MINIO") != "_yes_" && os.Getenv("USE_CEPH") != "_yes_" {
+		localTasks = append(localTasks, sealtasks.TTFinalize)
+	}
+
 	if sc.AllowAddPiece {
 		localTasks = append(localTasks, sealtasks.TTAddPiece)
 	}
