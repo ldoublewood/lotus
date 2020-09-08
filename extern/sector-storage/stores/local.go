@@ -69,6 +69,8 @@ type Local struct {
 	paths map[ID]*path
 
 	localLk sync.RWMutex
+
+	hddLk sync.Mutex
 }
 
 type path struct {
@@ -227,6 +229,10 @@ func (st *Local) open(ctx context.Context) error {
 	}
 
 	go st.reportHealth(ctx)
+	targetHddPath := os.Getenv("TARGET_HDD_PATH")
+	if targetHddPath != "" {
+		go st.dropHdd(ctx, targetHddPath)
+	}
 
 	return nil
 }
@@ -260,6 +266,142 @@ func (st *Local) reportHealth(ctx context.Context) {
 			if err := st.index.StorageReportHealth(ctx, id, report); err != nil {
 				log.Warnf("error reporting storage health for %s: %+v", id, report)
 			}
+		}
+	}
+}
+
+func (st *Local) scanAndCopyToHdd(target string) error {
+	st.hddLk.Lock()
+	defer st.hddLk.Unlock()
+	return st.doScanAndCopyToHdd(target)
+}
+func (st *Local) doScanAndCopyToHdd(target string) error {
+	for _, path := range st.paths {
+		parent := filepath.Join(path.local, FTCache.String())
+		// get sectors under cache
+		children, _, err := getChildren(parent)
+		if err != nil {
+			return err
+		}
+
+		for _, sector := range children {
+			if sector == FetchTempSubdir {
+				continue
+			}
+			hddDir := filepath.Join(target, sector)
+			_, err := os.Stat(hddDir)
+			if err != nil {
+				if os.IsNotExist(err){
+					errm := os.Mkdir(hddDir, 0755)
+					if errm != nil {
+						return errm
+					}
+				}
+			}
+
+			memDir := filepath.Join(parent, sector)
+
+			// get cache items
+			filenames, links, err := getChildren(filepath.Join(parent, sector))
+			if err != nil {
+				return err
+			}
+
+			for _, filename := range filenames {
+				from := filepath.Join(memDir, filename)
+				to := filepath.Join(hddDir, filename)
+				err = moveAndLink(from, to)
+				if err != nil {
+					return nil
+				}
+			}
+
+			// resolve link
+			for _, filename := range append(filenames, links...) {
+				if st.isLastLayer(filename) {
+					err := forceLink(hddDir, memDir)
+					if err != nil {
+						return err
+					}
+					// sector completed
+					break
+				}
+
+			}
+
+		}
+	}
+	return nil
+}
+
+func (st *Local) resolveLink(target string) error {
+	for _, path := range st.paths {
+		parent := filepath.Join(path.local, FTCache.String())
+		// get sectors under cache
+		children, _, err := getChildren(parent)
+		if err != nil {
+			return err
+		}
+
+		for _, sector := range children {
+			if sector == FetchTempSubdir {
+				continue
+			}
+			hddDir := filepath.Join(target, sector)
+			memDir := filepath.Join(parent, sector)
+
+			// get cache items
+			nonlinks, links, err := getChildren(filepath.Join(parent, sector))
+			if err != nil {
+				return err
+			}
+			// normally file means not completed
+			if len(nonlinks) != 0 {
+				continue
+			}
+
+			for _, filename := range links {
+				if st.isLastLayer(filename) {
+					err := forceLink(hddDir, memDir)
+					if err != nil {
+						return err
+					}
+					// sector completed
+					break
+				}
+
+			}
+
+		}
+	}
+	return nil
+}
+
+func (st *Local) isLastLayer(filename string) bool {
+	sectorsize := os.Getenv("SECTOR_SIZE")
+	if sectorsize == "" || sectorsize == "32GiB" {
+		return filename == "sc-02-data-layer-11.dat"
+	} else if sectorsize == "512MiB" {
+		return filename == "sc-02-data-layer-2.dat"
+	} else {
+		log.Errorf("not supported sector size: %d", sectorsize)
+		return true
+	}
+}
+
+func (st *Local) dropHdd(ctx context.Context, target string) {
+	// randomize interval by ~10%
+	interval := (DropHddInterval*100_000 + time.Duration(rand.Int63n(10_000))) / 100_000
+
+	for {
+		select {
+		case <-time.After(interval):
+		case <-ctx.Done():
+			return
+		}
+		err := st.scanAndCopyToHdd(target)
+		if err != nil {
+			log.Warnf("scan and copy to hdd: %+v", err)
 		}
 	}
 }
@@ -399,6 +541,7 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 		}
 
 		if best == "" {
+			log.Warnf("best is empty, sector %d(t:%d)", sid, fileType)
 			return SectorPaths{}, SectorPaths{}, xerrors.Errorf("couldn't find a suitable path for a sector")
 		}
 
@@ -513,10 +656,29 @@ func (st *Local) removeSector(ctx context.Context, sid abi.SectorID, typ SectorF
 	spath := p.sectorPath(sid, typ)
 	log.Infof("remove %s", spath)
 
-	if err := os.RemoveAll(spath); err != nil {
-		log.Errorf("removing sector (%v) from %s: %+v", sid, spath, err)
+	fileInfo, err := os.Stat(spath)
+	if err != nil {
+		return xerrors.Errorf("stat %s: %w", spath, err)
+	}
+	var realpath string
+	if fileInfo.Mode() & os.ModeSymlink != 0 {
+		realpath, err = filepath.EvalSymlinks(spath)
+		if err != nil {
+			return xerrors.Errorf("eval symlinks %s: %w", spath, err)
+		}
+	} else {
+		realpath = spath
 	}
 
+	if err := os.RemoveAll(realpath); err != nil {
+		log.Errorf("removing sector (%v) from %s: %+v", sid, realpath, err)
+	}
+	// in case of softlink, should delete the link also
+	if spath != realpath {
+		if err := os.RemoveAll(spath); err != nil {
+			log.Errorf("removing sector link (%v) from %s: %+v", sid, spath, err)
+		}
+	}
 	return nil
 }
 
