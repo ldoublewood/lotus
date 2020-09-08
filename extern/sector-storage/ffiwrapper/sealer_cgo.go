@@ -668,7 +668,7 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			return err
 		}
 		if len(keepUnsealed) > 0 {
-			err = copy(paths.Sealed, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
+			err = copy(paths.Unsealed, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
 			if err != nil {
 				return err
 			}
