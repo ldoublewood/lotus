@@ -586,6 +586,7 @@ func copy(from, to string) error {
 }
 
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
+	var unsealedPath string
 	if len(keepUnsealed) > 0 {
 		maxPieceSize := abi.PaddedPieceSize(sb.ssize)
 
@@ -615,7 +616,7 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		if xerrors.Is(err, os.ErrNotExist) {
 			return xerrors.Errorf("opening partial file: %w", err)
 		}
-
+		unsealedPath = paths.Unsealed
 		var at uint64
 		for sr.HasNext() {
 			r, err := sr.NextRun()
@@ -672,7 +673,7 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			return err
 		}
 		if len(keepUnsealed) > 0 {
-			err = copy(paths.Unsealed, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
+			err = copy(unsealedPath, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
 			if err != nil {
 				return err
 			}
