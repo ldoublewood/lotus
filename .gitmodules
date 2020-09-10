@@ -8,3 +8,12 @@
 [submodule "extern/test-vectors"]
 	path = extern/test-vectors
 	url = https://github.com/filecoin-project/test-vectors.git
+[submodule "extern/rust-filecoin-proofs-api"]
+	path = extern/rust-filecoin-proofs-api
+	url = ../rust-filecoin-proofs-api
+[submodule "extern/rust-fil-proofs"]
+	path = extern/rust-fil-proofs
+	url = ../rust-fil-proofs
+[submodule "extern/specs-storage"]
+	path = extern/specs-storage
+	url = ../specs-storage

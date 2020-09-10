@@ -519,7 +519,7 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 
 					log.Infof("[%d] Running replication(1)...", i)
 					pieces := []abi.PieceInfo{pieces[ix]}
-					pc1o, err := sb.SealPreCommit1(context.TODO(), sid, ticket, pieces)
+					pc1o, err := sb.SealPreCommit1(context.TODO(), sid, ticket, pieces, false)
 					if err != nil {
 						return xerrors.Errorf("commit: %w", err)
 					}
