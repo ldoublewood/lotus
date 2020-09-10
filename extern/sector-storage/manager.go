@@ -241,8 +241,6 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, stores.FTNone, stores.PathNone, false)
 	}
 
-	var readOk bool
-
 	if len(best) > 0 {
 		// There is unsealed sector, see if we can read from it
 
