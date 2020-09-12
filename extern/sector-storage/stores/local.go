@@ -516,12 +516,15 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 		var bestID ID
 
 		for _, si := range sis {
+			//log.Debugf("checking storage", si)
 			p, ok := st.paths[si.ID]
 			if !ok {
+				//log.Debugf("path not OK", si)
 				continue
 			}
 
 			if p.local == "" { // TODO: can that even be the case?
+				//log.Debug("path is empty")
 				continue
 			}
 
