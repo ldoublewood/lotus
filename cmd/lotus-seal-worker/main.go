@@ -102,6 +102,11 @@ var runCmd = &cli.Command{
 			Value: "0.0.0.0:3456",
 		},
 		&cli.StringFlag{
+			Name:  "bind-address",
+			Usage: "bind address",
+			Value: "0.0.0.0:3456",
+		},
+		&cli.StringFlag{
 			Name:   "address",
 			Hidden: true,
 		},
@@ -353,7 +358,12 @@ var runCmd = &cli.Command{
 
 		mux := mux.NewRouter()
 
-		log.Info("Setting up control endpoint at " + address)
+		bindAddress := cctx.String("bind-address")
+		if bindAddress == "" {
+			bindAddress = address
+		}
+
+		log.Info("Setting up control endpoint at " + bindAddress)
 
 		readerHandler, readerServerOpt := rpcenc.ReaderParamDecoder()
 		rpcServer := jsonrpc.NewServer(readerServerOpt)
@@ -385,7 +395,7 @@ var runCmd = &cli.Command{
 			log.Warn("Graceful shutdown successful")
 		}()
 
-		nl, err := net.Listen("tcp", address)
+		nl, err := net.Listen("tcp", bindAddress)
 		if err != nil {
 			return err
 		}

@@ -3,8 +3,11 @@ package sectorstorage
 import (
 	"context"
 	"fmt"
+	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 	"math/rand"
+	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -80,6 +83,8 @@ type workerHandle struct {
 	w Worker
 
 	info storiface.WorkerInfo
+	acceptTasks map[sealtasks.TaskType]struct{}
+	path []stores.StoragePath
 
 	preparing *activeResources
 	active    *activeResources
@@ -114,6 +119,7 @@ type activeResources struct {
 	memUsedMax uint64
 	gpuUsed    bool
 	cpuUse     uint64
+	gpuUse     uint64
 
 	cond *sync.Cond
 }
@@ -198,6 +204,55 @@ func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType
 	}
 }
 
+func (sh *scheduler) Run(ctx context.Context, sector abi.SectorID, taskType sealtasks.TaskType, sel WorkerSelector, prepare WorkerAction, work WorkerAction) error {
+	ret := make(chan workerResponse)
+
+	task := &workerRequest{
+		sector:   sector,
+		taskType: taskType,
+		priority: getPriority(ctx),
+		sel:      sel,
+
+		prepare: prepare,
+		work:    work,
+
+		ret: ret,
+		ctx: ctx,
+	}
+	for i, worker := range sh.workers {
+		rpcCtx, cancel := context.WithTimeout(ctx, SelectorTimeout)
+		ok, err := sel.Ok(rpcCtx, taskType, sh.spt, worker)
+		cancel()
+		if err != nil {
+			log.Errorf("Run req.sel.Ok error: %+v", err)
+			continue
+		}
+		if !ok {
+			continue
+		}
+		log.Debugf("assign worker sector %d directlly", sector.Number)
+		taskDone := make(chan struct{}, 1)
+		err = sh.assignWorker(taskDone, i, worker, task)
+		sh.workersLk.RUnlock()
+
+		if err != nil {
+			log.Error("assignWorker error: %+v", err)
+			return xerrors.Errorf("assignWorker error: %w", err)
+		}
+		select {
+		   case <- taskDone:
+			   log.Debugw("run task done", "workerid", worker.info.Hostname)
+		   case <-sh.closing:
+			   log.Debugw("closing task", "workerid", worker.info.Hostname)
+		   	   return nil
+		}
+		return nil
+
+	}
+	return xerrors.Errorf("cannot find worker, sector %d", sector.Number)
+
+}
+
 func (r *workerRequest) respond(err error) {
 	select {
 	case r.ret <- workerResponse{err: err}:
@@ -205,6 +260,7 @@ func (r *workerRequest) respond(err error) {
 		log.Warnf("request got cancelled before we could respond")
 	}
 }
+
 
 type SchedDiagRequestInfo struct {
 	Sector   abi.SectorID
@@ -215,6 +271,14 @@ type SchedDiagRequestInfo struct {
 type SchedDiagInfo struct {
 	Requests    []SchedDiagRequestInfo
 	OpenWindows []WorkerID
+}
+
+type usedResources struct {
+	memUsedMin uint64
+	memUsedMax uint64
+	cpuUse     uint64
+	gpuUse     uint64
+
 }
 
 func (sh *scheduler) runSched() {
@@ -412,7 +476,7 @@ func (sh *scheduler) trySched() {
 
 	wg.Wait()
 
-	log.Debugf("SCHED windows: %+v", windows)
+	log.Debugf("SCHED windows: %d", len(windows))
 	log.Debugf("SCHED Acceptable win: %+v", acceptableWindows)
 
 	// Step 2
@@ -636,8 +700,8 @@ func (sh *scheduler) workerCompactWindows(worker *workerHandle, wid WorkerID) in
 
 				moved = append(moved, ti)
 				lower.todo = append(lower.todo, todo)
-				lower.allocated.add(worker.info.Resources, needRes)
-				window.allocated.free(worker.info.Resources, needRes)
+				added := lower.allocated.add(worker.info.Resources, needRes)
+				window.allocated.free(added)
 			}
 
 			if len(moved) > 0 {
@@ -676,7 +740,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 	needRes := ResourceTable[req.taskType][sh.spt]
 
 	w.lk.Lock()
-	w.preparing.add(w.info.Resources, needRes)
+	used := w.preparing.add(w.info.Resources, needRes)
 	w.lk.Unlock()
 
 	go func() {
@@ -685,8 +749,9 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 
 		if err != nil {
 			w.lk.Lock()
-			w.preparing.free(w.info.Resources, needRes)
+			w.preparing.free(used)
 			w.lk.Unlock()
+
 			sh.workersLk.Unlock()
 
 			select {
@@ -707,7 +772,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 
 		err = w.active.withResources(wid, w.info.Resources, needRes, &sh.workersLk, func() error {
 			w.lk.Lock()
-			w.preparing.free(w.info.Resources, needRes)
+			w.preparing.free(used)
 			w.lk.Unlock()
 			sh.workersLk.Unlock()
 			defer sh.workersLk.Lock() // we MUST return locked from this function
@@ -739,6 +804,69 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 	}()
 
 	return nil
+}
+
+
+func getMinusCpu() uint64 {
+	var minusCpuNum int
+	var err error
+	// use cpu by default
+	minusCpu, ok := os.LookupEnv("SEAL_MINUS_CPU")
+	if !ok {
+		minusCpuNum = 0
+	} else {
+		minusCpuNum, err = strconv.Atoi(minusCpu)
+		if err != nil {
+			log.Warnf("invalid minus cpu number %+v", err)
+			minusCpuNum = 0
+		}
+	}
+	return uint64(minusCpuNum)
+}
+func getVirtualGpu(res storiface.WorkerResources) uint64 {
+	return uint64(len(res.GPUs)) + getPlusGpu()
+}
+
+func getPlusGpu() uint64 {
+	var plusGpuNum int
+	var err error
+	// use cpu by default
+	plusGpu, ok := os.LookupEnv("SEAL_PLUS_GPU")
+	if !ok {
+		plusGpuNum = 0
+	} else {
+		plusGpuNum, err = strconv.Atoi(plusGpu)
+		if err != nil {
+			log.Warnf("invalid plus gpu number %+v", err)
+			plusGpuNum = 0
+		}
+	}
+	return uint64(plusGpuNum)
+}
+
+func getNeedGpuCpu(needRes Resources, res storiface.WorkerResources, active *activeResources) (cpu uint64, gpu uint64) {
+	fallback := os.Getenv("SEAL_GPU_AUTO_FALLBACK") == "_yes_"
+	gpus := getVirtualGpu(res)
+	if needRes.MultiThread() {
+		if os.Getenv("SEAL_USE_GPU") != "_yes_" || !needRes.CanGPU || len(res.GPUs) == 0 {
+			cpu = res.CPUs - getMinusCpu()
+			gpu = 0
+		} else {
+			tryNeedGpu := uint64(1)
+			if active.gpuUse+tryNeedGpu > gpus && fallback {
+				// fallback to cpu
+				cpu = res.CPUs - getMinusCpu()
+				gpu = 0
+			} else {
+				cpu = 0
+				gpu = tryNeedGpu
+			}
+		}
+	} else {
+		cpu = uint64(needRes.Threads)
+		gpu = 0
+	}
+	return
 }
 
 func (sh *scheduler) newWorker(w *workerHandle) {
