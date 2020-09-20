@@ -17,6 +17,7 @@ import (
 )
 
 var HeartbeatInterval = 10 * time.Second
+var DropHddInterval = 5 * time.Second
 var SkippedHeartbeatThresh = HeartbeatInterval * 5
 
 // ID identifies sector storage by UUID. One sector storage should map to one
@@ -308,7 +309,7 @@ func (i *Index) StorageFindSector(ctx context.Context, s abi.SectorID, ft Sector
 			}
 
 			if spaceReq > uint64(st.fsi.Available) {
-				log.Debugf("not selecting on %s, out of space (available: %d, need: %d)", st.info.ID, st.fsi.Available, spaceReq)
+	//				log.Debugf("not selecting on %s, out of space (available: %d, need: %d)", st.info.ID, st.fsi.Available, spaceReq)
 				continue
 			}
 
@@ -385,7 +386,7 @@ func (i *Index) StorageBestAlloc(ctx context.Context, allocate SectorFileType, s
 		}
 
 		if spaceReq > uint64(p.fsi.Available) {
-			log.Debugf("not allocating on %s, out of space (available: %d, need: %d)", p.info.ID, p.fsi.Available, spaceReq)
+			//log.Debugf("not allocating on %s, out of space (available: %d, need: %d)", p.info.ID, p.fsi.Available, spaceReq)
 			continue
 		}
 
