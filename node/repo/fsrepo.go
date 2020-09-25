@@ -202,7 +202,11 @@ func (fsr *FsRepo) APIToken() ([]byte, error) {
 
 // Lock acquires exclusive lock on this repo
 func (fsr *FsRepo) Lock(repoType RepoType) (LockedRepo, error) {
-	locked, err := fslock.Locked(fsr.path, fsLock)
+	lockFile := fsLock
+	if os.Getenv("RUN_POST_ONLY") == "_yes_" {
+		lockFile = "post_" + lockFile
+	}
+	locked, err := fslock.Locked(fsr.path, lockFile)
 	if err != nil {
 		return nil, xerrors.Errorf("could not check lock status: %w", err)
 	}
@@ -210,7 +214,7 @@ func (fsr *FsRepo) Lock(repoType RepoType) (LockedRepo, error) {
 		return nil, ErrRepoAlreadyLocked
 	}
 
-	closer, err := fslock.Lock(fsr.path, fsLock)
+	closer, err := fslock.Lock(fsr.path, lockFile)
 	if err != nil {
 		return nil, xerrors.Errorf("could not lock the repo: %w", err)
 	}

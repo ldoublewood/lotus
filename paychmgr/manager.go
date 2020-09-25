@@ -2,6 +2,7 @@ package paychmgr
 
 import (
 	"context"
+	"os"
 	"sync"
 
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -111,14 +112,16 @@ func newManager(pchstore *Store, pchapi managerAPI) (*Manager, error) {
 
 // HandleManager is called by dependency injection to set up hooks
 func HandleManager(lc fx.Lifecycle, pm *Manager) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			return pm.Start()
-		},
-		OnStop: func(context.Context) error {
-			return pm.Stop()
-		},
-	})
+	if os.Getenv("RUN_POST_ONLY") != "_yes_" {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				return pm.Start()
+			},
+			OnStop: func(context.Context) error {
+				return pm.Stop()
+			},
+		})
+	}
 }
 
 // Start restarts tracking of any messages that were sent to chain.

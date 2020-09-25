@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/dline"
@@ -143,9 +144,9 @@ func (m *Miner) Run(ctx context.Context) error {
 	adaptedAPI := NewSealingAPIAdapter(m.api)
 	pcp := sealing.NewBasicPreCommitPolicy(adaptedAPI, miner.MaxSectorExpirationExtension-(miner.WPoStProvingPeriod*2), md.PeriodStart%miner.WPoStProvingPeriod)
 	m.sealing = sealing.New(adaptedAPI, fc, NewEventsAdapter(evts), m.maddr, m.ds, m.sealer, m.sc, m.verif, &pcp, sealing.GetSealingConfigFunc(m.getSealConfig), m.handleSealingNotifications)
-
-	go m.sealing.Run(ctx) //nolint:errcheck // logged intside the function
-
+	if os.Getenv("RUN_POST_ONLY") != "_yes_" {
+		go m.sealing.Run(ctx) //nolint:errcheck // logged intside the function
+	}
 	return nil
 }
 

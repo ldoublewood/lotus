@@ -2,6 +2,7 @@ package lp2p
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -96,6 +97,9 @@ func listenAddresses(addresses []string) ([]ma.Multiaddr, error) {
 
 func StartListening(addresses []string) func(host host.Host) error {
 	return func(host host.Host) error {
+		if os.Getenv("RUN_POST_ONLY") == "_yes_" {
+			return nil
+		}
 		listenAddrs, err := listenAddresses(addresses)
 		if err != nil {
 			return err

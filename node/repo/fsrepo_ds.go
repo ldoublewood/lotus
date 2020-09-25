@@ -32,7 +32,9 @@ func chainBadgerDs(path string) (datastore.Batching, error) {
 
 	opts.Options = dgbadger.DefaultOptions("").WithTruncate(true).
 		WithValueThreshold(1 << 10)
-
+	if os.Getenv("RUN_POST_ONLY") == "_yes_" {
+		opts.BypassLockGuard = true
+	}
 	return badger.NewDatastore(path, &opts)
 }
 
@@ -41,15 +43,22 @@ func badgerDs(path string) (datastore.Batching, error) {
 	opts.Options = dgbadger.DefaultOptions("").WithTruncate(true).
 		WithValueThreshold(1 << 10)
 
+	if os.Getenv("RUN_POST_ONLY") == "_yes_" {
+		opts.BypassLockGuard = true
+	}
 	return badger.NewDatastore(path, &opts)
 }
 
 func levelDs(path string) (datastore.Batching, error) {
-	return levelds.NewDatastore(path, &levelds.Options{
-		Compression: ldbopts.NoCompression,
-		NoSync:      false,
-		Strict:      ldbopts.StrictAll,
-	})
+	readOnly := os.Getenv("RUN_POST_ONLY") == "_yes_"
+	op := &levelds.Options{
+			Compression: ldbopts.NoCompression,
+			NoSync:      false,
+			Strict:      ldbopts.StrictAll,
+		    ReadOnly:     readOnly,
+	}
+
+	return levelds.NewDatastore(path, op)
 }
 
 func (fsr *fsLockedRepo) openDatastores() (map[string]datastore.Batching, error) {

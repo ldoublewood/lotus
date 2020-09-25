@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"os"
 	"sync"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -43,17 +44,19 @@ type FundMgr struct {
 // StartFundManager creates a new fund manager and sets up event hooks to manage state changes
 func StartFundManager(lc fx.Lifecycle, api API) *FundMgr {
 	fm := newFundMgr(&api)
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			ev := events.NewEvents(ctx, &api)
-			preds := state.NewStatePredicates(&api)
-			dealDiffFn := preds.OnStorageMarketActorChanged(preds.OnBalanceChanged(preds.AvailableBalanceChangedForAddresses(fm.getAddresses)))
-			match := func(oldTs, newTs *types.TipSet) (bool, events.StateChange, error) {
-				return dealDiffFn(ctx, oldTs.Key(), newTs.Key())
-			}
-			return ev.StateChanged(fm.checkFunc, fm.stateChanged, fm.revert, 0, events.NoTimeout, match)
-		},
-	})
+	if os.Getenv("RUN_POST_ONLY") != "_yes_" {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				ev := events.NewEvents(ctx, &api)
+				preds := state.NewStatePredicates(&api)
+				dealDiffFn := preds.OnStorageMarketActorChanged(preds.OnBalanceChanged(preds.AvailableBalanceChangedForAddresses(fm.getAddresses)))
+				match := func(oldTs, newTs *types.TipSet) (bool, events.StateChange, error) {
+					return dealDiffFn(ctx, oldTs.Key(), newTs.Key())
+				}
+				return ev.StateChanged(fm.checkFunc, fm.stateChanged, fm.revert, 0, events.NoTimeout, match)
+			},
+		})
+	}
 	return fm
 }
 

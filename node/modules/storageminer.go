@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"go.uber.org/fx"
@@ -212,37 +213,40 @@ func StorageMiner(fc config.MinerFeeConfig) func(params StorageMinerParams) (*st
 }
 
 func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.RetrievalProvider) {
-	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
-			m.SubscribeToEvents(marketevents.RetrievalProviderLogger)
+	if os.Getenv("RUN_POST_ONLY") != "_yes_" {
+		lc.Append(fx.Hook{
+			OnStart: func(context.Context) error {
+				m.SubscribeToEvents(marketevents.RetrievalProviderLogger)
 
-			evtType := journal.J.RegisterEventType("markets/retrieval/provider", "state_change")
-			m.SubscribeToEvents(markets.RetrievalProviderJournaler(evtType))
+				evtType := journal.J.RegisterEventType("markets/retrieval/provider", "state_change")
+				m.SubscribeToEvents(markets.RetrievalProviderJournaler(evtType))
 
-			return m.Start()
-		},
-		OnStop: func(context.Context) error {
-			return m.Stop()
-		},
-	})
+				return m.Start()
+			},
+			OnStop: func(context.Context) error {
+				return m.Stop()
+			},
+		})
+	}
 }
 
 func HandleDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host, h storagemarket.StorageProvider) {
 	ctx := helpers.LifecycleCtx(mctx, lc)
+	if os.Getenv("RUN_POST_ONLY") != "_yes_" {
+		lc.Append(fx.Hook{
+			OnStart: func(context.Context) error {
+				h.SubscribeToEvents(marketevents.StorageProviderLogger)
 
-	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
-			h.SubscribeToEvents(marketevents.StorageProviderLogger)
+				evtType := journal.J.RegisterEventType("markets/storage/provider", "state_change")
+				h.SubscribeToEvents(markets.StorageProviderJournaler(evtType))
 
-			evtType := journal.J.RegisterEventType("markets/storage/provider", "state_change")
-			h.SubscribeToEvents(markets.StorageProviderJournaler(evtType))
-
-			return h.Start(ctx)
-		},
-		OnStop: func(context.Context) error {
-			return h.Stop()
-		},
-	})
+				return h.Start(ctx)
+			},
+			OnStop: func(context.Context) error {
+				return h.Stop()
+			},
+		})
+	}
 }
 
 // NewProviderDAGServiceDataTransfer returns a data transfer manager that just
@@ -257,15 +261,17 @@ func NewProviderDAGServiceDataTransfer(lc fx.Lifecycle, h host.Host, gs dtypes.S
 	if err != nil {
 		return nil, err
 	}
+	if os.Getenv("RUN_POST_ONLY") != "_yes_" {
 
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			return dt.Start(ctx)
-		},
-		OnStop: func(ctx context.Context) error {
-			return dt.Stop(ctx)
-		},
-	})
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				return dt.Start(ctx)
+			},
+			OnStop: func(ctx context.Context) error {
+				return dt.Stop(ctx)
+			},
+		})
+	}
 	return dt, nil
 }
 
@@ -373,9 +379,11 @@ func NewStorageAsk(ctx helpers.MetricsCtx, fapi lapi.FullNode, ds dtypes.Metadat
 	}
 	// Hacky way to set max piece size to the sector size
 	a := storedAsk.GetAsk().Ask
-	err = storedAsk.SetAsk(a.Price, a.VerifiedPrice, a.Expiry-a.Timestamp, storagemarket.MaxPieceSize(abi.PaddedPieceSize(mi.SectorSize)))
-	if err != nil {
-		return storedAsk, err
+	if os.Getenv("RUN_POST_ONLY") != "_yes_" {
+		err = storedAsk.SetAsk(a.Price, a.VerifiedPrice, a.Expiry-a.Timestamp, storagemarket.MaxPieceSize(abi.PaddedPieceSize(mi.SectorSize)))
+		if err != nil {
+			return storedAsk, err
+		}
 	}
 	return storedAsk, nil
 }
