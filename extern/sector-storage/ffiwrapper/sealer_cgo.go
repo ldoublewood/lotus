@@ -6,12 +6,18 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/ipfs/go-cid"
 	"io"
+	"io/ioutil"
 	"math/bits"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strings"
 
-	"github.com/ipfs/go-cid"
+	"github.com/mitchellh/go-homedir"
+
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
@@ -33,7 +39,6 @@ func New(sectors SectorProvider, cfg *Config) (*Sealer, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	sb := &Sealer{
 		sealProofType: cfg.SealProofType,
 		ssize:         sectorSize,
@@ -112,7 +117,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 	pr := io.TeeReader(io.LimitReader(file, int64(pieceSize)), pw)
 
-	chunk := abi.PaddedPieceSize(4 << 20)
+	chunk := abi.PaddedPieceSize(1024 << 20)
 
 	buf := make([]byte, chunk.Unpadded())
 	var pieceCids []abi.PieceInfo
@@ -519,7 +524,38 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
 }
 
+func copy(from, to string) error {
+	from, err := homedir.Expand(from)
+	if err != nil {
+		return xerrors.Errorf("copy: expanding from: %w", err)
+	}
+
+	to, err = homedir.Expand(to)
+	if err != nil {
+		return xerrors.Errorf("copy: expanding to: %w", err)
+	}
+
+	if filepath.Base(from) != filepath.Base(to) {
+		return xerrors.Errorf("copy: base names must match ('%s' != '%s')", filepath.Base(from), filepath.Base(to))
+	}
+
+	log.Debugw("copy sector data", "from", from, "to", to)
+
+	// `mv` has decades of experience in moving files quickly; don't pretend we
+	//  can do better
+
+	var errOut bytes.Buffer
+	cmd := exec.Command("/usr/bin/env", "/bin/cp", "-fr", from, to) // nolint
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return xerrors.Errorf("exec cp (stderr: %s): %w", strings.TrimSpace(errOut.String()), err)
+	}
+
+	return nil
+}
+
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
+	var unsealedPath string
 	if len(keepUnsealed) > 0 {
 		maxPieceSize := abi.PaddedPieceSize(sb.ssize)
 
@@ -549,7 +585,7 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		if xerrors.Is(err, os.ErrNotExist) {
 			return xerrors.Errorf("opening partial file: %w", err)
 		}
-
+		unsealedPath = paths.Unsealed
 		var at uint64
 		for sr.HasNext() {
 			r, err := sr.NextRun()
@@ -576,13 +612,44 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		}
 	}
 
-	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache, 0, stores.PathStorage)
+	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache|stores.FTSealed, 0, stores.PathStorage)
 	if err != nil {
 		return xerrors.Errorf("acquiring sector cache path: %w", err)
 	}
 	defer done()
 
-	return ffi.ClearCache(uint64(sb.ssize), paths.Cache)
+	err = ffi.ClearCache(uint64(sb.ssize), paths.Cache)
+	if err != nil {
+		return err
+	}
+
+	cephPath := os.Getenv("CEPH_PATH")
+	if cephPath != "" {
+		files, err := ioutil.ReadDir(paths.Cache)
+		if err != nil {
+			return err
+		}
+
+		if len(files) == 0 {
+			return xerrors.Errorf("cache path is empty: %s", paths.Cache)
+		}
+		err = copy(paths.Cache, filepath.Join(cephPath, stores.FTCache.String(), stores.SectorName(sector)))
+		if err != nil {
+			return err
+		}
+		err = copy(paths.Sealed, filepath.Join(cephPath, stores.FTSealed.String(), stores.SectorName(sector)))
+		if err != nil {
+			return err
+		}
+		if len(keepUnsealed) > 0 {
+			err = copy(unsealedPath, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+	return nil
 }
 
 func (sb *Sealer) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {
