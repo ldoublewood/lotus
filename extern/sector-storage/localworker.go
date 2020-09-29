@@ -106,6 +106,10 @@ func (l *LocalWorker) sb() (ffiwrapper.Storage, error) {
 	return ffiwrapper.New(&localWorkerPathProvider{w: l}, l.scfg)
 }
 
+func (l *LocalWorker) sb2() (*ffiwrapper.Sealer, error) {
+	return ffiwrapper.New(&localWorkerPathProvider{w: l}, l.scfg)
+}
+
 func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error {
 	sb, err := l.sb()
 	if err != nil {
@@ -181,12 +185,13 @@ func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phas
 }
 
 func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage2.Range) error {
-	sb, err := l.sb()
+	var storeid string
+	sb, err := l.sb2()
 	if err != nil {
 		return err
 	}
 
-	if err := sb.FinalizeSector(ctx, sector, keepUnsealed); err != nil {
+	if storeid, err = sb.FinalizeSector2(ctx, sector, keepUnsealed); err != nil {
 		return xerrors.Errorf("finalizing sector: %w", err)
 	}
 
@@ -197,7 +202,15 @@ func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, k
 		}
 	}
 
+	var minerStorageId string
+
 	if len(l.minerStorageId) != 0 {
+		minerStorageId = string(l.minerStorageId)
+	} else if len(storeid) != 0 {
+		minerStorageId = storeid
+	}
+
+	if len(minerStorageId) != 0 {
 
 		if err := l.storage.Remove(ctx, sector, stores.FTUnsealed, true); err != nil {
 			return xerrors.Errorf("removing unsealed data: %w", err)
@@ -214,7 +227,7 @@ func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, k
 				unsealed = stores.FTNone
 			}
 		}
-		err = l.sindex.StorageDeclareSector(ctx, l.minerStorageId, sector, stores.FTCache|stores.FTSealed|unsealed, true)
+		err = l.sindex.StorageDeclareSector(ctx, stores.ID(minerStorageId), sector, stores.FTCache|stores.FTSealed|unsealed, true)
 		if err != nil {
 			return xerrors.Errorf("declare shared sector: %w", err)
 		}

@@ -115,7 +115,7 @@ func forceLink(from, to string) error {
 	return nil
 }
 
-func getChildren(parent string) ([]string, []string, error) {
+func GetChildren(parent string) ([]string, []string, error) {
 	var nonlinks, links []string
 	files, err := ioutil.ReadDir(parent)
 	if err != nil {

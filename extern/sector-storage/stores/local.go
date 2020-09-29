@@ -279,7 +279,7 @@ func (st *Local) doScanAndCopyToHdd(target string) error {
 	for _, path := range st.paths {
 		parent := filepath.Join(path.local, FTCache.String())
 		// get sectors under cache
-		children, _, err := getChildren(parent)
+		children, _, err := GetChildren(parent)
 		if err != nil {
 			return err
 		}
@@ -302,7 +302,7 @@ func (st *Local) doScanAndCopyToHdd(target string) error {
 			memDir := filepath.Join(parent, sector)
 
 			// get cache items
-			filenames, links, err := getChildren(filepath.Join(parent, sector))
+			filenames, links, err := GetChildren(filepath.Join(parent, sector))
 			if err != nil {
 				return err
 			}
@@ -338,7 +338,7 @@ func (st *Local) resolveLink(target string) error {
 	for _, path := range st.paths {
 		parent := filepath.Join(path.local, FTCache.String())
 		// get sectors under cache
-		children, _, err := getChildren(parent)
+		children, _, err := GetChildren(parent)
 		if err != nil {
 			return err
 		}
@@ -351,7 +351,7 @@ func (st *Local) resolveLink(target string) error {
 			memDir := filepath.Join(parent, sector)
 
 			// get cache items
-			nonlinks, links, err := getChildren(filepath.Join(parent, sector))
+			nonlinks, links, err := GetChildren(filepath.Join(parent, sector))
 			if err != nil {
 				return err
 			}

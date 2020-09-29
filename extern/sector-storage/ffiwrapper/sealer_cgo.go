@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/filecoin-project/lotus/extern/sector-storage/fsutil"
 	"github.com/ipfs/go-cid"
 	"io"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
@@ -554,6 +556,10 @@ func copy(from, to string) error {
 	return nil
 }
 
+func (sb *Sealer) FinalizeSector2(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) (string, error) {
+	return "", nil
+}
+
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
 	var unsealedPath string
 	if len(keepUnsealed) > 0 {
@@ -624,32 +630,117 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	}
 
 	cephPath := os.Getenv("CEPH_PATH")
+	sgPath := os.Getenv("SHARE_GROUP_PATH")
 	if cephPath != "" {
-		files, err := ioutil.ReadDir(paths.Cache)
+		//files, err := ioutil.ReadDir(paths.Cache)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//if len(files) == 0 {
+		//	return xerrors.Errorf("cache path is empty: %s", paths.Cache)
+		//}
+		//err = copy(paths.Cache, filepath.Join(cephPath, stores.FTCache.String(), stores.SectorName(sector)))
+		//if err != nil {
+		//	return err
+		//}
+		//err = copy(paths.Sealed, filepath.Join(cephPath, stores.FTSealed.String(), stores.SectorName(sector)))
+		//if err != nil {
+		//	return err
+		//}
+		//if len(keepUnsealed) > 0 {
+		//	err = copy(unsealedPath, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
+		//	if err != nil {
+		//		return err
+		//	}
+		//
+		//}
+		return copyTo(paths, cephPath, unsealedPath, keepUnsealed, sector)
+	} else if sgPath != "" {
+		gb := os.Getenv("LEAST_FREE_GB")
+		if gb == "" {
+			// 100GB by default
+			gb = "100"
+		}
+		igb, err  := strconv.Atoi(gb)
 		if err != nil {
 			return err
 		}
 
-		if len(files) == 0 {
-			return xerrors.Errorf("cache path is empty: %s", paths.Cache)
-		}
-		err = copy(paths.Cache, filepath.Join(cephPath, stores.FTCache.String(), stores.SectorName(sector)))
+		sharePaths, err := selectAvailablePath(sgPath, int64(igb) * 1073741824)
 		if err != nil {
 			return err
 		}
-		err = copy(paths.Sealed, filepath.Join(cephPath, stores.FTSealed.String(), stores.SectorName(sector)))
-		if err != nil {
-			return err
+		if len(sharePaths) == 0 {
+			return xerrors.Errorf("not available share path")
 		}
-		if len(keepUnsealed) > 0 {
-			err = copy(unsealedPath, filepath.Join(cephPath, stores.FTUnsealed.String(), stores.SectorName(sector)))
-			if err != nil {
-				return err
-			}
+		//randomly select 1 path
+		selected := uint64(sector.Number) % uint64(len(sharePaths))
+		path := sharePaths[selected]
 
-		}
+		return copyTo(paths, path, unsealedPath, keepUnsealed, sector)
 	}
 	return nil
+}
+
+func copyTo(paths stores.SectorPaths, dest string, unsealedPath string, keepUnsealed []storage.Range, sector abi.SectorID) error {
+	files, err := ioutil.ReadDir(paths.Cache)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return xerrors.Errorf("cache path is empty: %s", paths.Cache)
+	}
+	err = copy(paths.Cache, filepath.Join(dest, stores.FTCache.String(), stores.SectorName(sector)))
+	if err != nil {
+		return err
+	}
+	err = copy(paths.Sealed, filepath.Join(dest, stores.FTSealed.String(), stores.SectorName(sector)))
+	if err != nil {
+		return err
+	}
+	if len(keepUnsealed) > 0 {
+		err = copy(unsealedPath, filepath.Join(dest, stores.FTUnsealed.String(), stores.SectorName(sector)))
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+func selectAvailablePath(parent string, leastFree int64) ([]string, error){
+	var paths []string
+	children, _, err := stores.GetChildren(parent)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range children {
+		//todo add temp dir later
+		//if sector == FetchTempSubdir {
+		//	continue
+		//}
+		path := filepath.Join(parent, name)
+		_, err := os.Stat(filepath.Join(path, ".out"))
+		if err != nil {
+			if !os.IsNotExist(err){
+				return nil, err
+			}
+		} else {
+			// skip it if .out file exist
+			continue
+		}
+
+		stat, err := fsutil.Statfs(path)
+		if err != nil {
+			return nil, err
+		}
+		if stat.Available < leastFree {
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
 }
 
 func (sb *Sealer) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {
