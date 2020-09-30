@@ -394,8 +394,10 @@ func (s *WindowPoStScheduler) runPost(ctx context.Context, di dline.Info, ts *ty
 			})
 		}()
 
-		posts := make([]miner.SubmitWindowedPoStParams, 0)
-		return posts, nil
+		if config.RunType != "" {
+			posts := make([]miner.SubmitWindowedPoStParams, 0)
+			return posts, nil
+		}
 	}
 
 	buf := new(bytes.Buffer)
