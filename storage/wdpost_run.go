@@ -3,6 +3,9 @@ package storage
 import (
 	"bytes"
 	"context"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/filecoin-project/go-bitfield"
@@ -27,6 +30,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
+	"github.com/filecoin-project/lotus/node/config"
 )
 
 func (s *WindowPoStScheduler) failPost(err error, deadline *dline.Info) {
@@ -327,67 +331,72 @@ func (s *WindowPoStScheduler) runPost(ctx context.Context, di dline.Info, ts *ty
 	ctx, span := trace.StartSpan(ctx, "storage.runPost")
 	defer span.End()
 
-	go func() {
-		// TODO: extract from runPost, run on fault cutoff boundaries
+	if config.RunType != "post" {
+		go func() {
+			// TODO: extract from runPost, run on fault cutoff boundaries
 
-		// check faults / recoveries for the *next* deadline. It's already too
-		// late to declare them for this deadline
-		declDeadline := (di.Index + 2) % di.WPoStPeriodDeadlines
+			// check faults / recoveries for the *next* deadline. It's already too
+			// late to declare them for this deadline
+			declDeadline := (di.Index + 2) % di.WPoStPeriodDeadlines
 
-		partitions, err := s.api.StateMinerPartitions(context.TODO(), s.actor, declDeadline, ts.Key())
-		if err != nil {
-			log.Errorf("getting partitions: %v", err)
-			return
-		}
+			partitions, err := s.api.StateMinerPartitions(context.TODO(), s.actor, declDeadline, ts.Key())
+			if err != nil {
+				log.Errorf("getting partitions: %v", err)
+				return
+			}
 
-		var (
-			sigmsg     *types.SignedMessage
-			recoveries []miner.RecoveryDeclaration
-			faults     []miner.FaultDeclaration
+			var (
+				sigmsg     *types.SignedMessage
+				recoveries []miner.RecoveryDeclaration
+				faults     []miner.FaultDeclaration
 
-			// optionalCid returns the CID of the message, or cid.Undef is the
-			// message is nil. We don't need the argument (could capture the
-			// pointer), but it's clearer and purer like that.
-			optionalCid = func(sigmsg *types.SignedMessage) cid.Cid {
-				if sigmsg == nil {
-					return cid.Undef
+				// optionalCid returns the CID of the message, or cid.Undef is the
+				// message is nil. We don't need the argument (could capture the
+				// pointer), but it's clearer and purer like that.
+				optionalCid = func(sigmsg *types.SignedMessage) cid.Cid {
+					if sigmsg == nil {
+						return cid.Undef
+					}
+					return sigmsg.Cid()
 				}
-				return sigmsg.Cid()
+			)
+
+			if recoveries, sigmsg, err = s.checkNextRecoveries(context.TODO(), declDeadline, partitions); err != nil {
+				// TODO: This is potentially quite bad, but not even trying to post when this fails is objectively worse
+				log.Errorf("checking sector recoveries: %v", err)
 			}
-		)
 
-		if recoveries, sigmsg, err = s.checkNextRecoveries(context.TODO(), declDeadline, partitions); err != nil {
-			// TODO: This is potentially quite bad, but not even trying to post when this fails is objectively worse
-			log.Errorf("checking sector recoveries: %v", err)
-		}
+			journal.J.RecordEvent(s.evtTypes[evtTypeWdPoStRecoveries], func() interface{} {
+				j := WdPoStRecoveriesProcessedEvt{
+					evtCommon:    s.getEvtCommon(err),
+					Declarations: recoveries,
+					MessageCID:   optionalCid(sigmsg),
+				}
+				j.Error = err
+				return j
+			})
 
-		journal.J.RecordEvent(s.evtTypes[evtTypeWdPoStRecoveries], func() interface{} {
-			j := WdPoStRecoveriesProcessedEvt{
-				evtCommon:    s.getEvtCommon(err),
-				Declarations: recoveries,
-				MessageCID:   optionalCid(sigmsg),
+			if ts.Height() > build.UpgradeIgnitionHeight {
+				return // FORK: declaring faults after ignition upgrade makes no sense
 			}
-			j.Error = err
-			return j
-		})
 
-		if ts.Height() > build.UpgradeIgnitionHeight {
-			return // FORK: declaring faults after ignition upgrade makes no sense
-		}
-
-		if faults, sigmsg, err = s.checkNextFaults(context.TODO(), declDeadline, partitions); err != nil {
-			// TODO: This is also potentially really bad, but we try to post anyways
-			log.Errorf("checking sector faults: %v", err)
-		}
-
-		journal.J.RecordEvent(s.evtTypes[evtTypeWdPoStFaults], func() interface{} {
-			return WdPoStFaultsProcessedEvt{
-				evtCommon:    s.getEvtCommon(err),
-				Declarations: faults,
-				MessageCID:   optionalCid(sigmsg),
+			if faults, sigmsg, err = s.checkNextFaults(context.TODO(), declDeadline, partitions); err != nil {
+				// TODO: This is also potentially really bad, but we try to post anyways
+				log.Errorf("checking sector faults: %v", err)
 			}
-		})
-	}()
+
+			journal.J.RecordEvent(s.evtTypes[evtTypeWdPoStFaults], func() interface{} {
+				return WdPoStFaultsProcessedEvt{
+					evtCommon:    s.getEvtCommon(err),
+					Declarations: faults,
+					MessageCID:   optionalCid(sigmsg),
+				}
+			})
+		}()
+
+		posts := make([]miner.SubmitWindowedPoStParams, 0)
+		return posts, nil
+	}
 
 	buf := new(bytes.Buffer)
 	if err := s.actor.MarshalCBOR(buf); err != nil {
@@ -405,11 +414,38 @@ func (s *WindowPoStScheduler) runPost(ctx context.Context, di dline.Info, ts *ty
 		return nil, xerrors.Errorf("getting partitions: %w", err)
 	}
 
-	// Split partitions into batches, so as not to exceed the number of sectors
-	// allowed in a single message
-	partitionBatches, err := s.batchPartitions(partitions)
-	if err != nil {
-		return nil, err
+	var partitionBatches [][]api.Partition
+	var begin int = -1
+	if config.RunType == "post" {
+		partIds := os.Getenv("PART_IDS") //环境变量PART_IDS定义分区索引
+		partArray := strings.Split(strings.Trim(partIds, ","), ",")
+		partNums := len(partitions)
+		if len(partArray) == 0 {
+			partitionBatches = append(partitionBatches, partitions)
+		} else if len(partArray) == 1 {
+			sid, err := strconv.Atoi(partArray[0])
+			if err == nil && sid < partNums {
+				partitionBatches = append(partitionBatches, partitions[sid:partNums])
+				begin = sid
+			}
+		} else {
+			var p []api.Partition
+			for _, item := range partArray {
+				sid, err := strconv.Atoi(item)
+				if err == nil && sid < partNums {
+					p = append(p, partitions[sid])
+				}
+			}
+			partitionBatches = append(partitionBatches, p)
+			begin, _ = strconv.Atoi(partArray[0])
+		}
+	} else {
+		// Split partitions into batches, so as not to exceed the number of sectors
+		// allowed in a single message
+		partitionBatches, err = s.batchPartitions(partitions)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Generate proofs in batches
@@ -418,6 +454,9 @@ func (s *WindowPoStScheduler) runPost(ctx context.Context, di dline.Info, ts *ty
 		batchPartitionStartIdx := 0
 		for _, batch := range partitionBatches[:batchIdx] {
 			batchPartitionStartIdx += len(batch)
+		}
+		if begin >= 0 {
+			batchPartitionStartIdx = begin
 		}
 
 		params := miner.SubmitWindowedPoStParams{

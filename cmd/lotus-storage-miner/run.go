@@ -23,6 +23,7 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/node"
+	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/impl"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
@@ -122,46 +123,10 @@ var runCmd = &cli.Command{
 			return err
 		}
 
-		endpoint, err := r.APIEndpoint()
-		if err != nil {
-			return err
-		}
+		if config.RunType == "post" {
+			sigChan := make(chan os.Signal, 2)
+			signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
-		// Bootstrap with full node
-		remoteAddrs, err := nodeApi.NetAddrsListen(ctx)
-		if err != nil {
-			return err
-		}
-
-		if err := minerapi.NetConnect(ctx, remoteAddrs); err != nil {
-			return err
-		}
-
-		log.Infof("Remote version %s", v)
-
-		lst, err := manet.Listen(endpoint)
-		if err != nil {
-			return xerrors.Errorf("could not listen: %w", err)
-		}
-
-		mux := mux.NewRouter()
-
-		rpcServer := jsonrpc.NewServer()
-		rpcServer.Register("Filecoin", apistruct.PermissionedStorMinerAPI(minerapi))
-
-		mux.Handle("/rpc/v0", rpcServer)
-		mux.PathPrefix("/remote").HandlerFunc(minerapi.(*impl.StorageMinerAPI).ServeRemote)
-		mux.PathPrefix("/").Handler(http.DefaultServeMux) // pprof
-
-		ah := &auth.Handler{
-			Verify: minerapi.AuthVerify,
-			Next:   mux.ServeHTTP,
-		}
-
-		srv := &http.Server{Handler: ah}
-
-		sigChan := make(chan os.Signal, 2)
-		go func() {
 			select {
 			case sig := <-sigChan:
 				log.Warnw("received shutdown", "signal", sig)
@@ -173,13 +138,68 @@ var runCmd = &cli.Command{
 			if err := stop(context.TODO()); err != nil {
 				log.Errorf("graceful shutting down failed: %s", err)
 			}
-			if err := srv.Shutdown(context.TODO()); err != nil {
-				log.Errorf("shutting down RPC server failed: %s", err)
-			}
 			log.Warn("Graceful shutdown successful")
-		}()
-		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+			return nil
+		} else {
+			endpoint, err := r.APIEndpoint()
+			if err != nil {
+				return err
+			}
 
-		return srv.Serve(manet.NetListener(lst))
+			// Bootstrap with full node
+			remoteAddrs, err := nodeApi.NetAddrsListen(ctx)
+			if err != nil {
+				return err
+			}
+
+			if err := minerapi.NetConnect(ctx, remoteAddrs); err != nil {
+				return err
+			}
+
+			log.Infof("Remote version %s", v)
+
+			lst, err := manet.Listen(endpoint)
+			if err != nil {
+				return xerrors.Errorf("could not listen: %w", err)
+			}
+
+			mux := mux.NewRouter()
+
+			rpcServer := jsonrpc.NewServer()
+			rpcServer.Register("Filecoin", apistruct.PermissionedStorMinerAPI(minerapi))
+
+			mux.Handle("/rpc/v0", rpcServer)
+			mux.PathPrefix("/remote").HandlerFunc(minerapi.(*impl.StorageMinerAPI).ServeRemote)
+			mux.PathPrefix("/").Handler(http.DefaultServeMux) // pprof
+
+			ah := &auth.Handler{
+				Verify: minerapi.AuthVerify,
+				Next:   mux.ServeHTTP,
+			}
+
+			srv := &http.Server{Handler: ah}
+
+			sigChan := make(chan os.Signal, 2)
+			go func() {
+				select {
+				case sig := <-sigChan:
+					log.Warnw("received shutdown", "signal", sig)
+				case <-shutdownChan:
+					log.Warn("received shutdown")
+				}
+
+				log.Warn("Shutting down...")
+				if err := stop(context.TODO()); err != nil {
+					log.Errorf("graceful shutting down failed: %s", err)
+				}
+				if err := srv.Shutdown(context.TODO()); err != nil {
+					log.Errorf("shutting down RPC server failed: %s", err)
+				}
+				log.Warn("Graceful shutdown successful")
+			}()
+			signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+
+			return srv.Serve(manet.NetListener(lst))
+		}
 	},
 }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding"
+	"os"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -204,3 +205,9 @@ func (dur Duration) MarshalText() ([]byte, error) {
 	d := time.Duration(dur)
 	return []byte(d.String()), nil
 }
+
+// RunType miner运行模式(环境变量RUN_TYPE控制)
+// 不设置为官方模式
+// miner - 运行miner不带window post
+// post - 只运行window post
+var RunType string = os.Getenv("RUN_TYPE")

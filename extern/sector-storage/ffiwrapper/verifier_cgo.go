@@ -4,6 +4,7 @@ package ffiwrapper
 
 import (
 	"context"
+	"os"
 
 	"github.com/filecoin-project/specs-actors/actors/runtime/proof"
 
@@ -34,17 +35,43 @@ func (sb *Sealer) GenerateWinningPoSt(ctx context.Context, minerID abi.ActorID, 
 
 func (sb *Sealer) GenerateWindowPoSt(ctx context.Context, minerID abi.ActorID, sectorInfo []proof.SectorInfo, randomness abi.PoStRandomness) ([]proof.PoStProof, []abi.SectorID, error) {
 	randomness[31] &= 0x3f
-	privsectors, skipped, done, err := sb.pubSectorToPriv(ctx, minerID, sectorInfo, nil, abi.RegisteredSealProof.RegisteredWindowPoStProof)
-	if err != nil {
-		return nil, nil, xerrors.Errorf("gathering sector info: %w", err)
-	}
-	defer done()
 
-	if len(skipped) > 0 {
-		return nil, skipped, xerrors.Errorf("pubSectorToPriv skipped some sectors")
+	var postsectors ffi.SortedPrivateSectorInfo
+	if os.Getenv("RUN_TYPE") == "post" {
+		var out []ffi.PrivateSectorInfo
+		for _, s := range sectorInfo {
+
+			postProofType, err := abi.RegisteredSealProof.RegisteredWindowPoStProof(s.SealProof)
+			if err != nil {
+				return nil, nil, xerrors.Errorf("acquiring registered PoSt proof from sector info %+v: %w", s, err)
+			}
+			sid := abi.SectorID{Miner: minerID, Number: s.SectorNumber}
+			sealed, cache, err := stores.GetSectorFiles(stores.SectorName(sid))
+			if err != nil {
+				return nil, nil, err
+			}
+			out = append(out, ffi.PrivateSectorInfo{
+				CacheDirPath:     cache,
+				PoStProofType:    postProofType,
+				SealedSectorPath: sealed,
+				SectorInfo:       s,
+			})
+		}
+		postsectors = ffi.NewSortedPrivateSectorInfo(out...)
+	} else {
+		privsectors, skipped, done, err := sb.pubSectorToPriv(ctx, minerID, sectorInfo, nil, abi.RegisteredSealProof.RegisteredWindowPoStProof)
+		if err != nil {
+			return nil, nil, xerrors.Errorf("gathering sector info: %w", err)
+		}
+		defer done()
+
+		if len(skipped) > 0 {
+			return nil, skipped, xerrors.Errorf("pubSectorToPriv skipped some sectors")
+		}
+		postsectors = privsectors
 	}
 
-	proof, faulty, err := ffi.GenerateWindowPoSt(minerID, privsectors, randomness)
+	proof, faulty, err := ffi.GenerateWindowPoSt(minerID, postsectors, randomness)
 
 	var faultyIDs []abi.SectorID
 	for _, f := range faulty {

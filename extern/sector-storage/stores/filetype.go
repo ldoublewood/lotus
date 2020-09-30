@@ -2,6 +2,9 @@ package stores
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"golang.org/x/xerrors"
 
@@ -138,4 +141,34 @@ func SetPathByType(sps *SectorPaths, fileType SectorFileType, p string) {
 	case FTCache:
 		sps.Cache = p
 	}
+}
+
+// GetSectorFiles 遍历存储目录找到相应的sealed cache 文件
+func GetSectorFiles(sid string) (sealed, cache string, err error) {
+	storageDir := os.Getenv("STORAGE_DIR") //环境变量STORAGE_DIR定义存储根目录
+	if storageDir == "" {
+		storageDir = "/store"
+	}
+
+	dir, err := ioutil.ReadDir(storageDir)
+	if err != nil {
+		return "", "", err
+	}
+
+	for _, fd := range dir {
+		if fd.IsDir() {
+			sf := filepath.Join(storageDir, fd.Name(), "sealed", sid)
+			cf := filepath.Join(storageDir, fd.Name(), "cache", sid)
+			if fileExist(sf) && fileExist(cf) {
+				return sf, cf, nil
+			}
+		}
+	}
+
+	return "", "", nil
+}
+
+func fileExist(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }

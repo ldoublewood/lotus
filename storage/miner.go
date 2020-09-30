@@ -150,7 +150,9 @@ func (m *Miner) Run(ctx context.Context) error {
 	pcp := sealing.NewBasicPreCommitPolicy(adaptedAPI, miner0.MaxSectorExpirationExtension-(miner0.WPoStProvingPeriod*2), md.PeriodStart%miner0.WPoStProvingPeriod)
 	m.sealing = sealing.New(adaptedAPI, fc, NewEventsAdapter(evts), m.maddr, m.ds, m.sealer, m.sc, m.verif, &pcp, sealing.GetSealingConfigFunc(m.getSealConfig), m.handleSealingNotifications)
 
-	go m.sealing.Run(ctx) //nolint:errcheck // logged intside the function
+	if config.RunType != "post" {
+		go m.sealing.Run(ctx) //nolint:errcheck // logged intside the function
+	}
 
 	return nil
 }

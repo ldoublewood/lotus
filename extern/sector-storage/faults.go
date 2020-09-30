@@ -43,11 +43,26 @@ func (m *Manager) CheckProvable(ctx context.Context, spt abi.RegisteredSealProof
 				return nil
 			}
 
-			lp, _, err := m.localStore.AcquireSector(ctx, sector, spt, stores.FTSealed|stores.FTCache, stores.FTNone, stores.PathStorage, stores.AcquireMove)
-			if err != nil {
-				log.Warnw("CheckProvable Sector FAULT: acquire sector in checkProvable", "sector", sector, "error", err)
-				bad = append(bad, sector)
-				return nil
+			var lp stores.SectorPaths
+			if os.Getenv("RUN_TYPE") == "post" {
+				sealed, cache, err := stores.GetSectorFiles(stores.SectorName(sector))
+				if err != nil {
+					log.Warnw("CheckProvable Sector FAULT: sector file stat error", err)
+					bad = append(bad, sector)
+					return nil
+				}
+
+				lp = stores.SectorPaths{
+					Sealed: sealed,
+					Cache:  cache,
+				}
+			} else {
+				lp, _, err = m.localStore.AcquireSector(ctx, sector, spt, stores.FTSealed|stores.FTCache, stores.FTNone, stores.PathStorage, stores.AcquireMove)
+				if err != nil {
+					log.Warnw("CheckProvable Sector FAULT: acquire sector in checkProvable", "sector", sector, "error", err)
+					bad = append(bad, sector)
+					return nil
+				}
 			}
 
 			if lp.Sealed == "" || lp.Cache == "" {

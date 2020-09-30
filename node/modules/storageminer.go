@@ -222,10 +222,16 @@ func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.Retrieva
 			evtType := journal.J.RegisterEventType("markets/retrieval/provider", "state_change")
 			m.SubscribeToEvents(markets.RetrievalProviderJournaler(evtType))
 
-			return m.Start()
+			if config.RunType != "post" {
+				return m.Start()
+			}
+			return nil
 		},
 		OnStop: func(context.Context) error {
-			return m.Stop()
+			if config.RunType != "post" {
+				return m.Stop()
+			}
+			return nil
 		},
 	})
 }
@@ -240,10 +246,16 @@ func HandleDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host, h sto
 			evtType := journal.J.RegisterEventType("markets/storage/provider", "state_change")
 			h.SubscribeToEvents(markets.StorageProviderJournaler(evtType))
 
-			return h.Start(ctx)
+			if config.RunType != "post" {
+				return h.Start(ctx)
+			}
+			return nil
 		},
 		OnStop: func(context.Context) error {
-			return h.Stop()
+			if config.RunType != "post" {
+				return h.Stop()
+			}
+			return nil
 		},
 	})
 }
@@ -263,10 +275,16 @@ func NewProviderDAGServiceDataTransfer(lc fx.Lifecycle, h host.Host, gs dtypes.S
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			return dt.Start(ctx)
+			if config.RunType != "post" {
+				return dt.Start(ctx)
+			}
+			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			return dt.Stop(ctx)
+			if config.RunType != "post" {
+				return dt.Stop(ctx)
+			}
+			return nil
 		},
 	})
 	return dt, nil
@@ -350,13 +368,18 @@ func SetupBlockProducer(lc fx.Lifecycle, ds dtypes.MetadataDS, api lapi.FullNode
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			if err := m.Start(ctx); err != nil {
-				return err
+			if config.RunType != "post" {
+				if err := m.Start(ctx); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			return m.Stop(ctx)
+			if config.RunType != "post" {
+				return m.Stop(ctx)
+			}
+			return nil
 		},
 	})
 
