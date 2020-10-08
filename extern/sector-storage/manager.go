@@ -459,6 +459,23 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		}
 	}
 
+	shared := os.Getenv("USE_SHARE_STORAGE") == "_yes_"
+	if shared {
+		selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, stores.FTCache|stores.FTSealed, stores.PathStorage, false)
+
+		err := m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
+			schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathSealing, stores.AcquireMove),
+			func(ctx context.Context, w Worker) error {
+				ferr := w.FinalizeSector(ctx, sector, keepUnsealed)
+				if ferr != nil {
+					return ferr
+				}
+				return w.MoveStorage(ctx, sector, stores.FTCache|stores.FTSealed|unsealed)
+			})
+		return err
+	}
+
+
 	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, stores.FTNone, stores.PathNone, false)
 
 	err := m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
