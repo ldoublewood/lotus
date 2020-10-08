@@ -6,12 +6,21 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
+	"github.com/filecoin-project/lotus/extern/sector-storage/fsutil"
+	"github.com/ipfs/go-cid"
 	"io"
+	"io/ioutil"
 	"math/bits"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 
-	"github.com/ipfs/go-cid"
+	"github.com/mitchellh/go-homedir"
+
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
@@ -33,7 +42,6 @@ func New(sectors SectorProvider, cfg *Config) (*Sealer, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	sb := &Sealer{
 		sealProofType: cfg.SealProofType,
 		ssize:         sectorSize,
@@ -112,7 +120,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 	pr := io.TeeReader(io.LimitReader(file, int64(pieceSize)), pw)
 
-	chunk := abi.PaddedPieceSize(4 << 20)
+	chunk := abi.PaddedPieceSize(1024 << 20)
 
 	buf := make([]byte, chunk.Unpadded())
 	var pieceCids []abi.PieceInfo
@@ -519,7 +527,43 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
 }
 
+func copy(from, to string) error {
+	from, err := homedir.Expand(from)
+	if err != nil {
+		return xerrors.Errorf("copy: expanding from: %w", err)
+	}
+
+	to, err = homedir.Expand(to)
+	if err != nil {
+		return xerrors.Errorf("copy: expanding to: %w", err)
+	}
+
+	if filepath.Base(from) != filepath.Base(to) {
+		return xerrors.Errorf("copy: base names must match ('%s' != '%s')", filepath.Base(from), filepath.Base(to))
+	}
+
+	log.Debugw("copy sector data", "from", from, "to", to)
+
+	// `mv` has decades of experience in moving files quickly; don't pretend we
+	//  can do better
+
+	var errOut bytes.Buffer
+	cmd := exec.Command("/usr/bin/env", "/bin/cp", "-fr", from, to) // nolint
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return xerrors.Errorf("exec cp (stderr: %s): %w", strings.TrimSpace(errOut.String()), err)
+	}
+
+	return nil
+}
+
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
+	return nil
+}
+
+func (sb *Sealer) FinalizeSector2(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) (string, error) {
+
+	var unsealedPath string
 	if len(keepUnsealed) > 0 {
 		maxPieceSize := abi.PaddedPieceSize(sb.ssize)
 
@@ -535,13 +579,13 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			var err error
 			sr, err = rlepluslazy.Subtract(sr, si)
 			if err != nil {
-				return err
+				return "", err
 			}
 		}
 
 		paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, 0, stores.PathStorage)
 		if err != nil {
-			return xerrors.Errorf("acquiring sector cache path: %w", err)
+			return "", xerrors.Errorf("acquiring sector cache path: %w", err)
 		}
 		defer done()
 
@@ -552,7 +596,7 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 				r, err := sr.NextRun()
 				if err != nil {
 					_ = pf.Close()
-					return err
+					return "",err
 				}
 
 				offset := at
@@ -564,28 +608,145 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 				err = pf.Free(storiface.PaddedByteIndex(abi.UnpaddedPieceSize(offset).Padded()), abi.UnpaddedPieceSize(r.Len).Padded())
 				if err != nil {
 					_ = pf.Close()
-					return xerrors.Errorf("free partial file range: %w", err)
+					return "",xerrors.Errorf("free partial file range: %w", err)
 				}
 			}
 
 			if err := pf.Close(); err != nil {
-				return err
+				return "",err
 			}
 		} else {
 			if !xerrors.Is(err, os.ErrNotExist) {
-				return xerrors.Errorf("opening partial file: %w", err)
+				return "",xerrors.Errorf("opening partial file: %w", err)
 			}
 		}
 
 	}
 
-	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache, 0, stores.PathStorage)
+	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache|stores.FTSealed, 0, stores.PathStorage)
 	if err != nil {
-		return xerrors.Errorf("acquiring sector cache path: %w", err)
+		return "", xerrors.Errorf("acquiring sector cache path: %w", err)
 	}
 	defer done()
 
-	return ffi.ClearCache(uint64(sb.ssize), paths.Cache)
+	err = ffi.ClearCache(uint64(sb.ssize), paths.Cache)
+	if err != nil {
+		return "", err
+	}
+
+	cephPath := os.Getenv("CEPH_PATH")
+	sgPath := os.Getenv("SHARE_GROUP_PATH")
+	if cephPath != "" {
+		//for ceph, storage id is read from ENV, thus return "" here
+		return "", copyTo(paths, cephPath, unsealedPath, keepUnsealed, sector)
+	} else if sgPath != "" {
+		gb := os.Getenv("LEAST_FREE_GB")
+		if gb == "" {
+			// 100GB by default
+			gb = "100"
+		}
+		igb, err  := strconv.Atoi(gb)
+		if err != nil {
+			return "", err
+		}
+
+		sharePaths, err := selectAvailablePath(sgPath, int64(igb) * 1073741824)
+		if err != nil {
+			return "", err
+		}
+		if len(sharePaths) == 0 {
+			return "", xerrors.Errorf("not available share path")
+		}
+		//randomly select 1 path
+		selected := uint64(sector.Number) % uint64(len(sharePaths))
+		path := sharePaths[selected]
+		id, err := getStorageIdFromPath(path)
+		if err != nil {
+			return "", err
+		}
+		return id, copyTo(paths, path, unsealedPath, keepUnsealed, sector)
+	}
+	return "", nil
+}
+func getStorageIdFromPath(storagerepo string) (string, error) {
+	mb, err := ioutil.ReadFile(filepath.Join(storagerepo, "sectorstore.json"))
+	if err != nil {
+		return "", xerrors.Errorf("reading storage repo: %w",err)
+	}
+
+	var meta stores.LocalStorageMeta
+	if err := json.Unmarshal(mb, &meta); err != nil {
+		return "", xerrors.Errorf("GARBAGE unmarshalling storage metadata for %s: %w", storagerepo, err)
+	}
+
+	return string(meta.ID), nil
+	//for _, fileType := range stores.PathTypes {
+	//spath := filepath.Join(storagerepo, fileType.String(), stores.SectorName(sector))
+	//stores.SetPathByType(&tpaths, fileType, spath)
+	//if err := l.sindex.StorageDeclareSector(ctx, stores.ID(scectorID), sector, fileType, true); err != nil {
+	// return nil, xerrors.Errorf("%s declare sector error: %+v", infostr, err)
+	//}
+	//}
+}
+
+func copyTo(paths stores.SectorPaths, dest string, unsealedPath string, keepUnsealed []storage.Range, sector abi.SectorID) error {
+	files, err := ioutil.ReadDir(paths.Cache)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return xerrors.Errorf("cache path is empty: %s", paths.Cache)
+	}
+	err = copy(paths.Cache, filepath.Join(dest, stores.FTCache.String(), stores.SectorName(sector)))
+	if err != nil {
+		return err
+	}
+	err = copy(paths.Sealed, filepath.Join(dest, stores.FTSealed.String(), stores.SectorName(sector)))
+	if err != nil {
+		return err
+	}
+	if len(keepUnsealed) > 0 {
+		err = copy(unsealedPath, filepath.Join(dest, stores.FTUnsealed.String(), stores.SectorName(sector)))
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+func selectAvailablePath(parent string, leastFree int64) ([]string, error){
+	var paths []string
+	children, _, err := stores.GetChildren(parent)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range children {
+		//todo add temp dir later
+		//if sector == FetchTempSubdir {
+		//	continue
+		//}
+		path := filepath.Join(parent, name)
+		_, err := os.Stat(filepath.Join(path, ".out"))
+		if err != nil {
+			if !os.IsNotExist(err){
+				return nil, err
+			}
+		} else {
+			// skip it if .out file exist
+			continue
+		}
+
+		stat, err := fsutil.Statfs(path)
+		if err != nil {
+			return nil, err
+		}
+		if stat.Available < leastFree {
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
 }
 
 func (sb *Sealer) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {
