@@ -664,7 +664,7 @@ func createStorageMiner(ctx context.Context, api lapi.FullNode, peerid peer.ID, 
 		Method: builtin0.MethodsPower.CreateMiner,
 		Params: params,
 
-		GasLimit:   0,
+		GasLimit:   10000000,
 		GasPremium: gasPrice,
 	}
 
