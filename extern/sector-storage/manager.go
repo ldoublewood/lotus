@@ -449,8 +449,16 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		}
 	}
 
+	var moveUnsealed stores.SectorFileType
 	shared := os.Getenv("USE_SHARE_STORAGE") == "_yes_"
 	if shared {
+		moveUnsealed = unsealed
+		{
+			if len(keepUnsealed) == 0 {
+				moveUnsealed = stores.FTNone
+			}
+		}
+
 		selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, stores.FTCache|stores.FTSealed, stores.PathStorage, false)
 
 		err := m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
@@ -460,7 +468,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 				if ferr != nil {
 					return ferr
 				}
-				return w.MoveStorage(ctx, sector, stores.FTCache|stores.FTSealed|unsealed)
+				return w.MoveStorage(ctx, sector, stores.FTCache|stores.FTSealed|moveUnsealed)
 			})
 
 		// in this case, return and ignore the remain logic in this function
@@ -479,7 +487,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		return err
 	}
 	fetchSel := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
-	moveUnsealed := unsealed
+	moveUnsealed = unsealed
 	{
 		if len(keepUnsealed) == 0 {
 			moveUnsealed = stores.FTNone
