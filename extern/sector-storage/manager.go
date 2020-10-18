@@ -122,7 +122,7 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	localTasks := []sealtasks.TaskType{
 		sealtasks.TTCommit1, sealtasks.TTFetch, sealtasks.TTReadUnsealed,
 	}
-	if os.Getenv("USE_CEPH") != "_yes_" {
+	if os.Getenv("USE_SHARE_STORAGE") != "_yes_" {
 		localTasks = append(localTasks, sealtasks.TTFinalize)
 	}
 
