@@ -201,7 +201,10 @@ func (st *Local) OpenPath(ctx context.Context, p string) error {
 			if ent.Name() == FetchTempSubdir {
 				continue
 			}
-
+			// hidden file, such .nfs0000000000003e7400000005
+			if ent.Name()[0] == '.' {
+				continue
+			}
 			sid, err := ParseSectorID(ent.Name())
 			if err != nil {
 				return xerrors.Errorf("parse sector id %s: %w", ent.Name(), err)
