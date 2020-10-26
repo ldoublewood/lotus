@@ -43,9 +43,13 @@ func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt 
 	for _, path := range paths {
 		have[path.ID] = struct{}{}
 	}
+	ssize, err := spt.SectorSize()
+	if err != nil {
+		return false, xerrors.Errorf("getting sector size: %w", err)
+	}
 
 	if s.alloc != stores.FTNone {
-		best, err := s.index.StorageBestAlloc(ctx, s.alloc, spt, s.ptype)
+		best, err := s.index.StorageBestAlloc(ctx, s.alloc, ssize, s.ptype)
 		if err != nil {
 			return false, xerrors.Errorf("finding best alloc storage: %w", err)
 		}
@@ -58,10 +62,6 @@ func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt 
 		if !allocOk {
 			return false, nil
 		}
-	}
-	ssize, err := spt.SectorSize()
-	if err != nil {
-		return false, xerrors.Errorf("getting sector size: %w", err)
 	}
 
 	best, err := s.index.StorageFindSector(ctx, s.sector, s.alloc, ssize, s.allowFetch)
