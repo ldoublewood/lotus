@@ -201,7 +201,7 @@ func (st *Local) OpenPath(ctx context.Context, p string) error {
 			if ent.Name() == FetchTempSubdir {
 				continue
 			}
-			// hidden file, such .nfs0000000000003e7400000005
+			// hidden file, such as .nfs0000000000003e7400000005
 			if ent.Name()[0] == '.' {
 				continue
 			}
