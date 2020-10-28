@@ -104,6 +104,12 @@ type workerHandle struct {
 	closingMgr     chan struct{}
 }
 
+type acceptWinTrace struct {
+	hostname string
+	// c: can't handle, n: not ok, o: ok
+	result string
+}
+
 type schedWindowRequest struct {
 	worker WorkerID
 
@@ -356,16 +362,22 @@ func (sh *scheduler) trySched() {
 			needRes := ResourceTable[task.taskType][sh.spt]
 
 			task.indexHeap = sqi
+			var trace acceptWinTrace
 			for wnd, windowRequest := range sh.openWindows {
+				trace = acceptWinTrace{
+					hostname: "",
+					result:   "",
+				}
 				worker, ok := sh.workers[windowRequest.worker]
 				if !ok {
 					log.Errorf("worker referenced by windowRequest not found (worker: %d)", windowRequest.worker)
 					// TODO: How to move forward here?
 					continue
 				}
-
+				trace.hostname = worker.info.Hostname
 				// TODO: allow bigger windows
 				if !windows[wnd].allocated.canHandleRequest(needRes, windowRequest.worker, "schedAcceptable", worker.info.Resources) {
+					trace.result = "c"
 					continue
 				}
 
@@ -374,10 +386,12 @@ func (sh *scheduler) trySched() {
 				cancel()
 				if err != nil {
 					log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
+					trace.result = "e"
 					continue
 				}
 
 				if !ok {
+					trace.result = "n"
 					continue
 				}
 
@@ -385,6 +399,7 @@ func (sh *scheduler) trySched() {
 			}
 
 			if len(acceptableWindows[sqi]) == 0 {
+				log.Debugf("no acceptable windows: %+v", trace)
 				return
 			}
 
@@ -418,7 +433,7 @@ func (sh *scheduler) trySched() {
 
 	wg.Wait()
 
-	log.Debugf("SCHED windows: %+v", windows)
+	log.Debugf("SCHED windows: %d", len(windows))
 	log.Debugf("SCHED Acceptable win: %+v", acceptableWindows)
 
 	// Step 2
