@@ -362,15 +362,16 @@ func (sh *scheduler) trySched() {
 			needRes := ResourceTable[task.taskType][sh.spt]
 
 			task.indexHeap = sqi
-			var trace acceptWinTrace
+			var traces []acceptWinTrace
 			for wnd, windowRequest := range sh.openWindows {
-				trace = acceptWinTrace{
+				trace := acceptWinTrace{
 					hostname: "",
 					result:   "",
 				}
 				worker, ok := sh.workers[windowRequest.worker]
 				if !ok {
 					log.Errorf("worker referenced by windowRequest not found (worker: %d)", windowRequest.worker)
+					traces = append(traces, trace)
 					// TODO: How to move forward here?
 					continue
 				}
@@ -378,6 +379,7 @@ func (sh *scheduler) trySched() {
 				// TODO: allow bigger windows
 				if !windows[wnd].allocated.canHandleRequest(needRes, windowRequest.worker, "schedAcceptable", worker.info.Resources) {
 					trace.result = "c"
+					traces = append(traces, trace)
 					continue
 				}
 
@@ -387,19 +389,22 @@ func (sh *scheduler) trySched() {
 				if err != nil {
 					log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
 					trace.result = "e"
+					traces = append(traces, trace)
 					continue
 				}
 
 				if !ok {
 					trace.result = "n"
+					traces = append(traces, trace)
 					continue
 				}
-
+				trace.result = "o"
+				traces = append(traces, trace)
 				acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
 			}
 
 			if len(acceptableWindows[sqi]) == 0 {
-				log.Debugf("no acceptable windows: %+v", trace)
+				log.Debugf("no acceptable windows: task:%s,sector:%d,%+v", task.taskType,task.sector,traces)
 				return
 			}
 
