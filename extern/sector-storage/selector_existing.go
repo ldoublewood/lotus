@@ -64,8 +64,7 @@ func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt 
 		}
 	}
 
-	best, err := s.index.StorageFindSector(ctx, s.sector, s.alloc, ssize, s.allowFetch)
-
+	best, err := s.index.StorageFindSector(ctx, s.sector, s.exist, ssize, s.allowFetch)
 	if err != nil {
 		return false, xerrors.Errorf("finding best storage: %w", err)
 	}
