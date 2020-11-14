@@ -2,6 +2,8 @@ package sectorstorage
 
 import (
 	"context"
+	"fmt"
+	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 	"math/rand"
 	"sort"
 	"sync"
@@ -79,6 +81,11 @@ type workerHandle struct {
 
 	info storiface.WorkerInfo
 
+	acceptTasks map[sealtasks.TaskType]struct{}
+
+	path []stores.StoragePath
+
+
 	preparing *activeResources
 	active    *activeResources
 
@@ -93,6 +100,12 @@ type workerHandle struct {
 	cleanupStarted bool
 	closedMgr      chan struct{}
 	closingMgr     chan struct{}
+}
+
+type acceptWinTrace struct {
+	hostname string
+	// c: can't handle, n: not ok, o: ok
+	result string
 }
 
 type schedWindowRequest struct {
@@ -381,21 +394,33 @@ func (sh *scheduler) trySched() {
 			needRes := ResourceTable[task.taskType][sh.spt]
 
 			task.indexHeap = sqi
+			var traces []acceptWinTrace
 			for wnd, windowRequest := range sh.openWindows {
+				trace := acceptWinTrace{
+					hostname: "",
+					result:   "",
+				}
 				worker, ok := sh.workers[windowRequest.worker]
 				if !ok {
 					log.Errorf("worker referenced by windowRequest not found (worker: %s)", windowRequest.worker)
 					// TODO: How to move forward here?
+					traces = append(traces, trace)
 					continue
 				}
+				trace.hostname = worker.info.Hostname
 
 				if !worker.enabled {
 					log.Debugw("skipping disabled worker", "worker", windowRequest.worker)
+					trace.result = "d"
+					traces = append(traces, trace)
 					continue
 				}
 
+
 				// TODO: allow bigger windows
 				if !windows[wnd].allocated.canHandleRequest(needRes, windowRequest.worker, "schedAcceptable", worker.info.Resources) {
+					trace.result = "c"
+					traces = append(traces, trace)
 					continue
 				}
 
@@ -404,17 +429,23 @@ func (sh *scheduler) trySched() {
 				cancel()
 				if err != nil {
 					log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
+					trace.result = "e"
+					traces = append(traces, trace)
 					continue
 				}
 
 				if !ok {
+					trace.result = "n"
+					traces = append(traces, trace)
 					continue
 				}
-
+				trace.result = "o"
+				traces = append(traces, trace)
 				acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
 			}
 
 			if len(acceptableWindows[sqi]) == 0 {
+				log.Debugf("no acceptable windows: task:%s,sector:%d,%+v", task.taskType,task.sector,traces)
 				return
 			}
 
@@ -448,7 +479,7 @@ func (sh *scheduler) trySched() {
 
 	wg.Wait()
 
-	log.Debugf("SCHED windows: %+v", windows)
+	log.Debugf("SCHED windows: %d", len(windows))
 	log.Debugf("SCHED Acceptable win: %+v", acceptableWindows)
 
 	// Step 2
