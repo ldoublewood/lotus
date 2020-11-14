@@ -459,7 +459,6 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, ssize abi.
 
 		if best == "" {
 			log.Warnf("best is empty, sector %d(t:%d)", sid, fileType)
-			return SectorPaths{}, SectorPaths{}, xerrors.Errorf("couldn't find a suitable path for a sector")
 			return storiface.SectorPaths{}, storiface.SectorPaths{}, xerrors.Errorf("couldn't find a suitable path for a sector")
 		}
 

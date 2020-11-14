@@ -2,7 +2,6 @@ package sectorstorage
 
 import (
 	"context"
-	"fmt"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 	"math/rand"
 	"sort"

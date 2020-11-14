@@ -15,13 +15,13 @@ import (
 type existingSelector struct {
 	index      stores.SectorIndex
 	sector     abi.SectorID
-	exist      storeiface.SectorFileType
-	ptype      storeiface.PathType
-	alloc      storeiface.SectorFileType
+	exist      storiface.SectorFileType
+	ptype      storiface.PathType
+	alloc      storiface.SectorFileType
 	allowFetch bool
 }
 
-func newExistingSelector(index storiface.SectorIndex, sector abi.SectorID, exist storiface.SectorFileType, alloc storiface.SectorFileType, ptype storiface.PathType, allowFetch bool) *existingSelector {
+func newExistingSelector(index stores.SectorIndex, sector abi.SectorID, exist storiface.SectorFileType, alloc storiface.SectorFileType, ptype storiface.PathType, allowFetch bool) *existingSelector {
 	return &existingSelector{
 		index:      index,
 		sector:     sector,
@@ -57,7 +57,7 @@ func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt 
 		return false, xerrors.Errorf("getting sector size: %w", err)
 	}
 
-	if s.alloc != stores.FTNone {
+	if s.alloc != storiface.FTNone {
 		best, err := s.index.StorageBestAlloc(ctx, s.alloc, ssize, s.ptype)
 		if err != nil {
 			return false, xerrors.Errorf("finding best alloc storage: %w", err)
