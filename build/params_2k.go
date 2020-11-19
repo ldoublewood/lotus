@@ -3,6 +3,8 @@
 package build
 
 import (
+	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	"math"
 	"os"
 
@@ -40,11 +42,13 @@ func init() {
 	}
 
 	BuildType |= Build2k
+	miner.PreCommitChallengeDelay = abi.ChainEpoch(10)
+	miner2.PreCommitChallengeDelay = abi.ChainEpoch(10)
 }
 
-const BlockDelaySecs = uint64(4)
+const BlockDelaySecs = uint64(20)
 
-const PropagationDelaySecs = uint64(1)
+const PropagationDelaySecs = uint64(5)
 
 // SlashablePowerDelay is the number of epochs after ElectionPeriodStart, after
 // which the miner is slashed
