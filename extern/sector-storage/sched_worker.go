@@ -28,14 +28,6 @@ func (sh *scheduler) runWorker(ctx context.Context, w Worker) error {
 	if err != nil {
 		return xerrors.Errorf("getting worker info: %w", err)
 	}
-	taskTypes, err := w.TaskTypes(ctx)
-	if err != nil {
-		return xerrors.Errorf("getting task type: %w", err)
-	}
-	path, err := w.Paths(ctx)
-	if err != nil {
-		return xerrors.Errorf("getting path info: %w", err)
-	}
 
 	sessID, err := w.Session(ctx)
 	if err != nil {
