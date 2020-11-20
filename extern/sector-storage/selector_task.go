@@ -2,7 +2,6 @@ package sectorstorage
 
 import (
 	"context"
-
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"

@@ -40,7 +40,6 @@ func (sh *scheduler) runWorker(ctx context.Context, w Worker) error {
 	worker := &workerHandle{
 		workerRpc: w,
 		info:      info,
-
 		preparing: &activeResources{},
 		active:    &activeResources{},
 		enabled:   true,

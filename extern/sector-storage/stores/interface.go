@@ -9,7 +9,23 @@ import (
 
 	"github.com/filecoin-project/lotus/extern/sector-storage/fsutil"
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
+
 )
+// type PathType string
+
+// const (
+//	PathStorage PathType = "storage"
+//	PathSealing PathType = "sealing"
+//	PathNone PathType = "none"
+
+// )
+
+// type AcquireMode string
+
+// const (
+//	AcquireMove AcquireMode = "move"
+//	AcquireCopy AcquireMode = "copy"
+
 
 type Store interface {
 	AcquireSector(ctx context.Context, s storage.SectorRef, existing storiface.SectorFileType, allocate storiface.SectorFileType, sealing storiface.PathType, op storiface.AcquireMode) (paths storiface.SectorPaths, stores storiface.SectorPaths, err error)

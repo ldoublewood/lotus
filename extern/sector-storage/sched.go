@@ -77,7 +77,6 @@ type workerHandle struct {
 	workerRpc Worker
 
 	info storiface.WorkerInfo
-
 	preparing *activeResources
 	active    *activeResources
 
@@ -93,7 +92,6 @@ type workerHandle struct {
 	closedMgr      chan struct{}
 	closingMgr     chan struct{}
 }
-
 type schedWindowRequest struct {
 	worker WorkerID
 
@@ -407,7 +405,6 @@ func (sh *scheduler) trySched() {
 				if !ok {
 					continue
 				}
-
 				acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
 			}
 
@@ -445,7 +442,7 @@ func (sh *scheduler) trySched() {
 
 	wg.Wait()
 
-	log.Debugf("SCHED windows: %+v", windows)
+	log.Debugf("SCHED windows: %d", len(windows))
 	log.Debugf("SCHED Acceptable win: %+v", acceptableWindows)
 
 	// Step 2
