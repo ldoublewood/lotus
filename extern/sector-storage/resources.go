@@ -2,6 +2,7 @@ package sectorstorage
 
 import (
 	"github.com/filecoin-project/go-state-types/abi"
+	"os"
 
 	"github.com/filecoin-project/lotus/extern/sector-storage/sealtasks"
 )
@@ -12,7 +13,7 @@ type Resources struct {
 
 	MaxParallelism int // -1 = multithread
 	CanGPU         bool
-
+	Snark uint64
 	BaseMinMemory uint64 // What Must be in RAM for decent perf (shared between threads)
 }
 
@@ -314,8 +315,57 @@ var ResourceTable = map[sealtasks.TaskType]map[abi.RegisteredSealProof]Resources
 func init() {
 	ResourceTable[sealtasks.TTUnseal] = ResourceTable[sealtasks.TTPreCommit1] // TODO: measure accurately
 	ResourceTable[sealtasks.TTReadUnsealed] = ResourceTable[sealtasks.TTFetch]
+	out := os.Getenv("USE_SNARK_OUTSOURCING") == "_yes_"
+	if out {
+		ResourceTable[sealtasks.TTCommit2] = map[abi.RegisteredSealProof]Resources{
+			abi.RegisteredSealProof_StackedDrg64GiBV1: Resources{
+				MaxMemory: 1 << 30,
+				MinMemory: 1 << 30,
 
-	// V1_1 is the same as V1
+				MaxParallelism: 1,
+				CanGPU:         false,
+
+				BaseMinMemory: 1 << 30, // params
+			},
+			abi.RegisteredSealProof_StackedDrg32GiBV1: Resources{
+				MaxMemory: 1 << 30, // TODO: ~30G of this should really be BaseMaxMemory
+				MinMemory: 1 << 30,
+
+				MaxParallelism: 1,
+				CanGPU:         false,
+
+				BaseMinMemory: 11 << 30, // params
+			},
+			abi.RegisteredSealProof_StackedDrg512MiBV1: Resources{
+				MaxMemory: 3 << 29, // 1.5G
+				MinMemory: 1 << 30,
+
+				MaxParallelism: 1, // This is fine
+				CanGPU:         true,
+
+				BaseMinMemory: 11 << 30,
+			},
+			abi.RegisteredSealProof_StackedDrg2KiBV1: Resources{
+				MaxMemory: 2 << 10,
+				MinMemory: 2 << 10,
+
+				MaxParallelism: 1,
+				CanGPU:         true,
+
+				BaseMinMemory: 2 << 10,
+			},
+			abi.RegisteredSealProof_StackedDrg8MiBV1: Resources{
+				MaxMemory: 8 << 20,
+				MinMemory: 8 << 20,
+
+				MaxParallelism: 1,
+				CanGPU:         true,
+
+				BaseMinMemory: 8 << 20,
+			},
+		}
+	}
+		// V1_1 is the same as V1
 	for _, m := range ResourceTable {
 		m[abi.RegisteredSealProof_StackedDrg2KiBV1_1] = m[abi.RegisteredSealProof_StackedDrg2KiBV1]
 		m[abi.RegisteredSealProof_StackedDrg8MiBV1_1] = m[abi.RegisteredSealProof_StackedDrg8MiBV1]

@@ -33,6 +33,7 @@ func (a *activeResources) add(wr storiface.WorkerResources, r Resources) {
 	a.cpuUse += r.Threads(wr.CPUs)
 	a.memUsedMin += r.MinMemory
 	a.memUsedMax += r.MaxMemory
+	a.snarkUse += r.Snark
 }
 
 func (a *activeResources) free(wr storiface.WorkerResources, r Resources) {

@@ -30,6 +30,7 @@ type WorkerResources struct {
 
 	CPUs uint64 // Logical cores
 	GPUs []string
+	Snarks uint64
 }
 
 type WorkerStats struct {
@@ -40,6 +41,8 @@ type WorkerStats struct {
 	MemUsedMax uint64
 	GpuUsed    bool   // nolint
 	CpuUse     uint64 // nolint
+	Snarks uint64
+
 }
 
 const (
