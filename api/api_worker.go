@@ -28,6 +28,10 @@ type WorkerAPI interface {
 
 	StorageAddLocal(ctx context.Context, path string) error
 
+	AddSnark(ctx context.Context, snarkUrl string) error
+
+	RemoveSnark(ctx context.Context, snarkUrl string) error
+
 	// SetEnabled marks the worker as enabled/disabled. Not that this setting
 	// may take a few seconds to propagate to task scheduler
 	SetEnabled(ctx context.Context, enabled bool) error

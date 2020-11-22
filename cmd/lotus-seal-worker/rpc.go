@@ -11,8 +11,10 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
+	"github.com/filecoin-project/lotus/extern/sector-storage/snark"
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 )
+
 
 type worker struct {
 	*sectorstorage.LocalWorker
@@ -20,7 +22,47 @@ type worker struct {
 	localStore *stores.Local
 	ls         stores.LocalStorage
 
+	snarkctl *snark.SnarkCtl
 	disabled int64
+}
+
+func (w *worker) AddSnark(ctx context.Context, snarkUrl string) error {
+	if err := w.SetSnark(func(sc *snark.SnarkInfo) {
+		sc.SnarkUrls = append(sc.SnarkUrls, snark.SnarkUrl{
+			Path:  snarkUrl,
+			State: snark.SnarkFree,
+		})
+	}); err != nil {
+		return xerrors.Errorf("set snark config: %w", err)
+	}
+	return nil
+}
+
+func (w *worker) RemoveSnark(ctx context.Context, snarkUrl string) error {
+	if err := w.SetSnark(func(sc *snark.SnarkInfo) {
+		for i, snark := range sc.SnarkUrls {
+			if snark.Path == snarkUrl {
+				sc.SnarkUrls = append(sc.SnarkUrls[:i], sc.SnarkUrls[i+1:]...)
+				break
+			}
+		}
+	}); err != nil {
+		return xerrors.Errorf("remove snark config: %w", err)
+	}
+	return nil
+}
+func (w *worker)SetSnark(c func(*snark.SnarkInfo)) error {
+	w.snarkctl.SnarkLk.Lock()
+	defer w.snarkctl.SnarkLk.Unlock()
+
+	sc, err := w.snarkctl.GetSnark()
+	if err != nil {
+		return xerrors.Errorf("get storage: %w", err)
+	}
+
+	c(sc)
+
+	return snark.WriteSnarkFile(w.snarkctl.SnarkConfig, *sc)
 }
 
 func (w *worker) Version(context.Context) (build.Version, error) {

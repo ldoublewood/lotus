@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/filecoin-project/lotus/extern/sector-storage/snark"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -371,13 +372,18 @@ var runCmd = &cli.Command{
 
 		wsts := statestore.New(namespace.Wrap(ds, modules.WorkerCallsPrefix))
 
+		ctl := snark.NewSnarkCtl()
+		if err := ctl.Load(); err != nil {
+			return err
+		}
 		workerApi := &worker{
 			LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
 				TaskTypes: taskTypes,
 				NoSwap:    cctx.Bool("no-swap"),
-			}, remote, localStore, nodeApi, nodeApi, wsts),
+			}, remote, localStore, nodeApi, nodeApi, wsts, ctl),
 			localStore: localStore,
 			ls:         lr,
+			snarkctl: ctl,
 		}
 
 		mux := mux.NewRouter()

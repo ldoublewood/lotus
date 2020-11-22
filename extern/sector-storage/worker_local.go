@@ -1,9 +1,15 @@
 package sectorstorage
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/filecoin-project/lotus/extern/sector-storage/snark"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"reflect"
 	"runtime"
@@ -46,6 +52,8 @@ type LocalWorker struct {
 	executor   ExecutorFunc
 	noSwap     bool
 
+	ctl *snark.SnarkCtl
+
 	ct          *workerCallTracker
 	acceptTasks map[sealtasks.TaskType]struct{}
 	running     sync.WaitGroup
@@ -55,7 +63,7 @@ type LocalWorker struct {
 	closing     chan struct{}
 }
 
-func newLocalWorker(executor ExecutorFunc, wcfg WorkerConfig, store stores.Store, local *stores.Local, sindex stores.SectorIndex, ret storiface.WorkerReturn, cst *statestore.StateStore) *LocalWorker {
+func newLocalWorker(executor ExecutorFunc, wcfg WorkerConfig, store stores.Store, local *stores.Local, sindex stores.SectorIndex, ret storiface.WorkerReturn, cst *statestore.StateStore, ctl *snark.SnarkCtl) *LocalWorker {
 	acceptTasks := map[sealtasks.TaskType]struct{}{}
 	for _, taskType := range wcfg.TaskTypes {
 		acceptTasks[taskType] = struct{}{}
@@ -74,6 +82,7 @@ func newLocalWorker(executor ExecutorFunc, wcfg WorkerConfig, store stores.Store
 		executor:    executor,
 		noSwap:      wcfg.NoSwap,
 
+		ctl: ctl,
 		session: uuid.New(),
 		closing: make(chan struct{}),
 	}
@@ -105,8 +114,8 @@ func newLocalWorker(executor ExecutorFunc, wcfg WorkerConfig, store stores.Store
 	return w
 }
 
-func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, sindex stores.SectorIndex, ret storiface.WorkerReturn, cst *statestore.StateStore) *LocalWorker {
-	return newLocalWorker(nil, wcfg, store, local, sindex, ret, cst)
+func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, sindex stores.SectorIndex, ret storiface.WorkerReturn, cst *statestore.StateStore, ctl *snark.SnarkCtl) *LocalWorker {
+	return newLocalWorker(nil, wcfg, store, local, sindex, ret, cst, ctl)
 }
 
 type localWorkerPathProvider struct {
@@ -371,9 +380,91 @@ func (l *LocalWorker) SealCommit2(ctx context.Context, sector storage.SectorRef,
 	}
 
 	return l.asyncCall(ctx, sector, SealCommit2, func(ctx context.Context, ci storiface.CallID) (interface{}, error) {
-		return sb.SealCommit2(ctx, sector, phase1Out)
+		if l.ctl.CxSnark {
+			return l.SealCommit2Remotely(ctx, sector, phase1Out)
+		} else {
+			return sb.SealCommit2(ctx, sector, phase1Out)
+		}
 	})
 }
+
+
+func (l *LocalWorker) SealCommit2Remotely(ctx context.Context, sector storage.SectorRef, phase1Out storage.Commit1Out) (storage.Proof, error) {
+	type Request struct {
+		SectorID   abi.SectorID
+		Commit1Out storage.Commit1Out
+	}
+	type Response struct {
+		SectorID abi.SectorID
+		Proof    storage.Proof
+	}
+	request := Request{}
+
+	request.SectorID = sector.ID
+
+	request.Commit1Out = phase1Out
+
+	b, err := json.Marshal(request)
+	if err != nil {
+		return storage.Proof{}, err
+	}
+	log.Debugf("b: ", string(b))
+	zBuf := new(bytes.Buffer)
+	zw := gzip.NewWriter(zBuf)
+	if _, err = zw.Write(b); err != nil {
+		return storage.Proof{}, xerrors.Errorf("-----gzip is faild,err: %v", err)
+	}
+
+	zw.Flush()
+	zw.Close()
+
+
+	remoteIp, err := l.ctl.ObtainSnark()
+	if err != nil {
+		return storage.Proof{}, err
+	}
+	defer func () {
+			if err := l.ctl.FreeSnark(remoteIp); err != nil {
+				log.Errorf("free snark url: %+v", err)
+			}
+	    }()
+
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/remote/seal/commit2", remoteIp), zBuf)
+	if err != nil {
+		return storage.Proof{}, xerrors.Errorf("http new requeest err: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json;charset=utf-8")
+	req.Header.Set("Content-Encoding", "gzip")
+	log.Debugf("request...")
+
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return storage.Proof{}, xerrors.Errorf("do request err: ", err)
+	}
+	if resp.StatusCode != 200 {
+		xerrors.Errorf("http client do code: %d err: %v", resp.StatusCode, err)
+	}
+	log.Debugf("request end...")
+	defer resp.Body.Close()
+
+	result, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return storage.Proof{}, xerrors.Errorf("ioutil read all err: %v", err)
+	}
+
+	response := Response{}
+	err = json.Unmarshal(result, &response)
+	if err != nil {
+		return storage.Proof{}, xerrors.Errorf("json format len: %d error: %v", len(result), err)
+	}
+
+	log.Debugf("result: %v\n", response)
+	return response.Proof, nil
+}
+
 
 func (l *LocalWorker) FinalizeSector(ctx context.Context, sector storage.SectorRef, keepUnsealed []storage.Range) (storiface.CallID, error) {
 	sb, err := l.executor()
