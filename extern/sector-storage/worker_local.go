@@ -13,6 +13,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -580,7 +581,25 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 	if l.noSwap {
 		memSwap = 0
 	}
-	snarks := len(l.ctl.Info.SnarkUrls)
+
+	var snarks uint64
+	if os.Getenv("USE_DBC_SNARK") == "_yes_" {
+		strSnarkNum := os.Getenv("DBC_SNARK_NUM")
+		if len(strSnarkNum) == 0 {
+			return storiface.WorkerInfo{}, xerrors.Errorf("DBC_SNARK_NUM should be set in case of USE_DBC_SNARK is _yes_")
+		}
+		snarkNum, err := strconv.Atoi(strSnarkNum)
+		if err != nil {
+			return storiface.WorkerInfo{}, xerrors.Errorf("DBC_SNARK_NUM should be digital_")
+		}
+		snarks = uint64(snarkNum)
+	} else if os.Getenv("USE_CX_SNARK") == "_yes_" {
+		snarks = uint64(len(l.ctl.Info.SnarkUrls))
+	} else {
+		snarks = 0
+	}
+
+
 
 	return storiface.WorkerInfo{
 		Hostname: hostname,

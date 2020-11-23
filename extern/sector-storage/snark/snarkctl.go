@@ -33,7 +33,7 @@ func NewSnarkCtl() *SnarkCtl {
 	return &SnarkCtl{
 		CxSnark:     os.Getenv("USE_CX_SNARK") == "_yes_",
 		SnarkLk:     sync.Mutex{},
-		SnarkConfig: "/etc/CxSnark.json",
+		SnarkConfig: "/etc/cxsnark.json",
 	}
 }
 
