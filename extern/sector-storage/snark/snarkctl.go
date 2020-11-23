@@ -38,6 +38,9 @@ func NewSnarkCtl() *SnarkCtl {
 }
 
 func (ctl *SnarkCtl)Load() error {
+	if !ctl.CxSnark {
+		return nil
+	}
 	info, err := ctl.GetSnark()
 	if err != nil {
 		return xerrors.Errorf("get storage: %w", err)
