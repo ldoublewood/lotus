@@ -16,11 +16,10 @@ const (
 	SnarkBusy State = "busy"
 )
 type SnarkCtl struct {
-	//snarkCx []string\
-	info        *SnarkInfo
+	Info        *SnarkInfo
 	CxSnark     bool
 	SnarkLk     sync.Mutex
-	snarkConfig string
+	SnarkConfig string
 }
 type SnarkUrl struct {
 	Path  string
@@ -34,7 +33,7 @@ func NewSnarkCtl() *SnarkCtl {
 	return &SnarkCtl{
 		CxSnark:     os.Getenv("USE_CX_SNARK") == "_yes_",
 		SnarkLk:     sync.Mutex{},
-		snarkConfig: "/etc/CxSnark.json",
+		SnarkConfig: "/etc/CxSnark.json",
 	}
 }
 
@@ -44,15 +43,15 @@ func (ctl *SnarkCtl)Load() error {
 		return xerrors.Errorf("get storage: %w", err)
 	}
 
-	ctl.info = info
+	ctl.Info = info
 	return nil
 }
 
 func (ctl *SnarkCtl) GetSnark() (*SnarkInfo, error) {
-	return SnarkFromFile(ctl.snarkConfig)
+	return SnarkFromFile(ctl.SnarkConfig)
 }
 func (ctl *SnarkCtl) ObtainSnark() (string, error) {
-	for _, url := range ctl.info.SnarkUrls {
+	for _, url := range ctl.Info.SnarkUrls {
 		if url.State == SnarkFree {
 			url.State = SnarkBusy
 			return url.Path, nil
@@ -61,7 +60,7 @@ func (ctl *SnarkCtl) ObtainSnark() (string, error) {
 	return "", xerrors.Errorf("no available snark url")
 }
 func (ctl *SnarkCtl) FreeSnark(urlToFree string) error {
-	for _, url := range ctl.info.SnarkUrls {
+	for _, url := range ctl.Info.SnarkUrls {
 		if url.Path == urlToFree {
 			if url.State != SnarkBusy {
 				log.Warnf("the target url is not in busy state: %s, url: %s", url.State, url.Path)

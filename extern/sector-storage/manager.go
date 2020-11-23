@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"context"
 	"errors"
+	"github.com/filecoin-project/lotus/extern/sector-storage/snark"
 	"io"
 	"net/http"
 	"sync"
@@ -158,10 +159,13 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, sc 
 	if sc.AllowUnseal {
 		localTasks = append(localTasks, sealtasks.TTUnseal)
 	}
-
+	ctl := snark.NewSnarkCtl()
+	if err := ctl.Load(); err != nil {
+		return nil, err
+	}
 	err = m.AddWorker(ctx, NewLocalWorker(WorkerConfig{
 		TaskTypes: localTasks,
-	}, stor, lstor, si, m, wss))
+	}, stor, lstor, si, m, wss, ctl))
 	if err != nil {
 		return nil, xerrors.Errorf("adding local worker: %w", err)
 	}

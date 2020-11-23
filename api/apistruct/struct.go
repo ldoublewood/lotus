@@ -388,6 +388,10 @@ type WorkerStruct struct {
 		Remove          func(ctx context.Context, sector abi.SectorID) error `perm:"admin"`
 		StorageAddLocal func(ctx context.Context, path string) error         `perm:"admin"`
 
+		AddSnark func(ctx context.Context, snarkUrl string) error `perm:"admin"`
+
+		RemoveSnark func(ctx context.Context, snarkUrl string) error `perm:"admin"`
+
 		SetEnabled func(ctx context.Context, enabled bool) error `perm:"admin"`
 		Enabled    func(ctx context.Context) (bool, error)       `perm:"admin"`
 
@@ -1563,6 +1567,14 @@ func (w *WorkerStruct) Remove(ctx context.Context, sector abi.SectorID) error {
 
 func (w *WorkerStruct) StorageAddLocal(ctx context.Context, path string) error {
 	return w.Internal.StorageAddLocal(ctx, path)
+}
+
+func (w *WorkerStruct) AddSnark(ctx context.Context, snarkUrl string) error {
+	return w.Internal.AddSnark(ctx, snarkUrl)
+}
+
+func (w *WorkerStruct) RemoveSnark(ctx context.Context, snarkUrl string) error {
+	return w.Internal.RemoveSnark(ctx, snarkUrl)
 }
 
 func (w *WorkerStruct) SetEnabled(ctx context.Context, enabled bool) error {
