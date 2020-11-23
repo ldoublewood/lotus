@@ -580,6 +580,7 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 	if l.noSwap {
 		memSwap = 0
 	}
+	snarks := len(l.ctl.Info.SnarkUrls)
 
 	return storiface.WorkerInfo{
 		Hostname: hostname,
@@ -589,6 +590,7 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 			MemReserved: mem.VirtualUsed + mem.Total - mem.Available, // TODO: sub this process
 			CPUs:        uint64(runtime.NumCPU()),
 			GPUs:        gpus,
+			Snarks: uint64(snarks),
 		},
 	}, nil
 }

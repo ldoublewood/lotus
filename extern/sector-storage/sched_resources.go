@@ -1,6 +1,7 @@
 package sectorstorage
 
 import (
+	"os"
 	"sync"
 
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
@@ -43,6 +44,7 @@ func (a *activeResources) free(wr storiface.WorkerResources, r Resources) {
 	a.cpuUse -= r.Threads(wr.CPUs)
 	a.memUsedMin -= r.MinMemory
 	a.memUsedMax -= r.MaxMemory
+	a.snarkUse -= r.Snark
 }
 
 func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, caller string, res storiface.WorkerResources) bool {
@@ -73,6 +75,12 @@ func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, call
 		}
 	}
 
+	if os.Getenv("USE_SNARK_OUTSOURCING") == "_yes_" {
+		if a.snarkUse+needRes.Snark > res.Snarks {
+			log.Debugf("sched: not scheduling on worker %d for %s; not enough snark, need %d, %d in use, target %d", wid, caller, needRes.Snark, a.snarkUse, res.Snarks)
+			return false
+		}
+	}
 	return true
 }
 
