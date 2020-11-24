@@ -60,6 +60,7 @@ func main() {
 		storageCmd,
 		setCmd,
 		waitQuietCmd,
+		snarkCmd,
 	}
 
 	app := &cli.App{

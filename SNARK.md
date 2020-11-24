@@ -8,7 +8,7 @@ USE_SNARK_OUTSOURCING=_yes_
 
 一台控制snark的worker机上设置：
 USE_DBC_SNARK=_yes_
-USE_DBC_SNARK=<可并行C2数量>
+DBC_SNARK_NUM=<可并行C2数量>
 
 ## CX
 miner上设置:
